@@ -1,0 +1,15 @@
+# Production overrides — compose merges this on top of docker-compose.yml.
+#   make prod   (or: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build)
+#
+# Changes vs. dev: only the client is exposed publicly (port 80); the
+# WebSocket/media ports and Ollama stay on the internal compose network.
+services:
+  server:
+    ports: !override []
+
+  client:
+    ports: !override
+      - "80:80"
+
+  ollama:
+    ports: !override []

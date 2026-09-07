@@ -1,0 +1,13 @@
+# Bind-mount override for hosts where Docker can mount the project folder
+# (Docker Desktop, or colima with Full Disk Access granted to its VM helper).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.bind.yml up -d
+#
+# With this file, books (./media) and Piper voices (./Server/models) are
+# edited on the host and visible in the container directly — no seeding.
+services:
+  server:
+    volumes: !override
+      - ./media:/data/media
+      - ./Server/models:/app/models
+      - model-cache:/root/.cache

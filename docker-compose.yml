@@ -1,0 +1,71 @@
+# AI Reading Assistant — development stack.
+#   make up   (or: docker compose up -d --build)
+#
+# Storage uses named volumes so this works on any host (macOS hosts often
+# block Docker bind-mounts under ~/Documents). Host content is copied into
+# the volumes automatically by `make up` (see the `seed` target).
+#
+# Optional profiles/overrides:
+#   -f docker-compose.bind.yml   use host bind mounts (Docker Desktop etc.)
+#   --profile minio              start a self-hosted S3-compatible object store
+services:
+  server:
+    build: ./Server
+    ports:
+      - "8765:8765" # WebSocket (direct access for native/E2E testing)
+      - "8766:8766" # Media HTTP (books.json, PDFs, health)
+    env_file: .env
+    environment:
+      # Inside the compose network the services talk by name.
+      LLM_BASE_URL: http://ollama:11434/v1
+      MEDIA_DIR: /data/media
+      PIPER_MODELS_DIR: /app/models
+    volumes:
+      - media:/data/media # books (seeded from ./media by `make up`)
+      - piper-models:/app/models # Piper voices (seeded from ./Server/models)
+      - model-cache:/root/.cache # faster-whisper model downloads
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./Client
+      args:
+        VITE_WS_URL: ${VITE_WS_URL:-}
+        VITE_MEDIA_URL: ${VITE_MEDIA_URL:-/media}
+    ports:
+      - "8080:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434" # handy for `ollama pull` from the host
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    profiles: ["minio"]
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio:/data
+    restart: unless-stopped
+
+volumes:
+  media:
+  piper-models:
+  model-cache:
+  ollama:
+  minio:
+
