@@ -29,7 +29,8 @@ import { Slider } from "@/components/ui/slider";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useReadingAssistant } from "@/hooks/useReadingAssistant";
-import { fetchBook } from "@/services/bookService";
+import { useToast } from "@/hooks/use-toast";
+import { fetchReadableBook } from "@/services/bookService";
 import {
   AssistantStatus,
   Book,
@@ -193,6 +194,7 @@ const Reading = () => {
   const bookId = searchParams.get("book") || "1";
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
   const [isAssistantOpen, setIsAssistantOpen] = useState(true);
@@ -206,12 +208,20 @@ const Reading = () => {
   useEffect(() => {
     const loadBook = async () => {
       setLoading(true);
-      const fetchedBook = await fetchBook(bookId);
-      setBook(fetchedBook);
+      const { book: resolvedBook, fellBack } = await fetchReadableBook(bookId);
+      setBook(resolvedBook);
       setCurrentChapterIndex(0);
       setLoading(false);
+      if (fellBack) {
+        toast({
+          title: "Book unavailable",
+          description: `We couldn't open that book right now, so you're reading "${resolvedBook.title}" instead. Add the missing file to media/books to read the original.`,
+          duration: 8000,
+        });
+      }
     };
     loadBook();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);
 
   const chapters = book?.chapters ?? [];

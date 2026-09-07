@@ -42,3 +42,50 @@ export const fetchBook = async (bookId: string): Promise<Book | null> => {
   return books.find((book) => book.id === bookId) || null;
 };
 
+// ── Reading-page resolution (with graceful fallback) ───────────────────
+
+export interface ResolvedBook {
+  book: Book;
+  fellBack: boolean;
+}
+
+/** Probe whether a media file actually exists. The catalogue can list books
+ * whose PDFs are missing — rendering such a URL in the reader's iframe shows
+ * the raw 404 body ("Not found: …"), so we check before rendering. */
+async function isPdfAvailable(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: "HEAD" });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+function pickSampleBook(bookId: string): Book {
+  return sampleBooks.find((book) => book.id === bookId) ?? sampleBooks[0];
+}
+
+/**
+ * Resolve the book the Reading page should show. If the requested book is
+ * missing from the catalogue, its PDF cannot be fetched, or the media server
+ * is offline, a bundled sample book is returned instead (same id when
+ * possible) so the child always has something to read. `fellBack` tells the
+ * caller to notify the user.
+ */
+export async function fetchReadableBook(bookId: string): Promise<ResolvedBook> {
+  try {
+    const books = await fetchMediaBooks();
+    const book = books.find((candidate) => candidate.id === bookId);
+    if (!book) {
+      return { book: pickSampleBook(bookId), fellBack: true };
+    }
+    if (book.pdfUrl && !(await isPdfAvailable(book.pdfUrl))) {
+      return { book: pickSampleBook(bookId), fellBack: true };
+    }
+    return { book, fellBack: false };
+  } catch {
+    // Media server unreachable or empty catalogue — bundled samples.
+    return { book: pickSampleBook(bookId), fellBack: true };
+  }
+}
+
