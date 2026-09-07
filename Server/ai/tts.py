@@ -53,5 +53,11 @@ class PiperTTS:
     def _synthesize_sync(self, text: str) -> bytes:
         buffer = io.BytesIO()
         with wave.open(buffer, "wb") as wav_file:
-            self._voice.synthesize(text, wav_file)
+            # piper-tts >= 1.3 removed WAV-header handling from synthesize()
+            # (raw frames only) — use synthesize_wav(), which writes the header
+            # itself. Older releases wrote the header inside synthesize().
+            if hasattr(self._voice, "synthesize_wav"):
+                self._voice.synthesize_wav(text, wav_file)
+            else:  # piper-tts < 1.3
+                self._voice.synthesize(text, wav_file)
         return buffer.getvalue()
