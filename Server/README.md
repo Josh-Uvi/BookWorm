@@ -1,8 +1,9 @@
 # AI Reading Assistant — Server
 
 Python 3.11 asyncio WebSocket server: streams browser audio through open-source AI providers —
-**faster-whisper** (STT) → **any OpenAI-compatible LLM** (Ollama by default) → **edge-tts/Piper**
-(TTS) — and speaks encouraging help back to the child. No cloud SDKs, no vendor credentials.
+**faster-whisper** (STT) → **any OpenAI-compatible LLM** (Ollama `llama3.2:1b` by default) →
+**Piper** (TTS, offline — voice baked into the Docker image; `edge-tts` online fallback)
+— and speaks encouraging help back to the child. No cloud SDKs, no vendor credentials.
 
 - **Docs**: [../docs/backend.md](../docs/backend.md)
 - **Quickstart (monorepo)**: [../README.md](../README.md) → `make setup && make up`

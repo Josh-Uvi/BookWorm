@@ -53,7 +53,9 @@ aws ecs create-service --cluster reading-assistant --service-name server \
 
 **LLM strategy:** the task definition sets `LLM_*` from these secrets — point them at any
 hosted OpenAI-compatible endpoint (Groq, OpenAI, Bedrock-compatible gateways, a vLLM EC2
-instance, or an Ollama sidecar container in the same task).
+instance, or an Ollama sidecar container in the same task). **TTS** runs fully offline: the
+default Piper voice is baked into the server image at build time (`PIPER_VOICE` build arg),
+so the Fargate task needs no extra volumes or internet access for speech.
 
 ## 4. Deploy
 

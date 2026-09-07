@@ -21,7 +21,7 @@ session.add_text() → when ACCUMULATION_WINDOW_SECONDS elapsed
 LLMClient.analyze(prompt)          (ai/llm.py — any OpenAI-compatible endpoint)
      │  JSON verdict {needs_help, help_message, confidence, reason}
      ▼  if needs_help
-TTSClient.synthesize(help_message) (ai/tts.py — edge-tts | piper)
+TTSClient.synthesize(help_message) (ai/tts.py — piper | edge_tts)
      ▼
 {"type":"help_needed", …, "audio":"<base64>"}   → client (spoken back to the child)
 ```
@@ -36,7 +36,7 @@ TTSClient.synthesize(help_message) (ai/tts.py — edge-tts | piper)
 | `ai/base.py` | `STTClient`, `LLMClient`, `TTSClient` protocols + `Transcript` types |
 | `ai/stt.py` | `FasterWhisperSTT` (CTranslate2, VAD-filtered) |
 | `ai/llm.py` | `OllamaLLM` (OpenAI-compatible Chat Completions) + robust JSON parsing |
-| `ai/tts.py` | `EdgeTTS` (online, zero-setup) and `PiperTTS` (offline) |
+| `ai/tts.py` | `PiperTTS` (offline, default — voice baked into the Docker image) and `EdgeTTS` (online fallback) |
 | `session.py` | Per-client audio buffer, epoch rotation, transcript accumulation, analysis timing |
 | `media_server.py` | stdlib HTTP: `/health`, `/books.json`, `/books/*` |
 | `storage.py` | `LocalStorage` (disk) / `MinioStorage` (S3-compatible) |
@@ -76,10 +76,10 @@ container header; the session retains it so buffer rotations stay decodable.
 | `STT_PROVIDER` | `faster_whisper` | STT implementation |
 | `WHISPER_MODEL` / `WHISPER_DEVICE` / `WHISPER_COMPUTE_TYPE` | `base` / `cpu` / `int8` | faster-whisper tuning (`float16` on GPU) |
 | `LLM_PROVIDER` | `ollama` | LLM implementation (any OpenAI-compatible endpoint) |
-| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | `http://localhost:11434/v1` / `ollama` / `llama3.2` | endpoint + model |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | `http://localhost:11434/v1` / `ollama` / `llama3.2:1b` | endpoint + model (lightweight 1B default) |
 | `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` / `LLM_TIMEOUT` | `0.3` / `500` / `30` | inference settings |
-| `TTS_PROVIDER` | `edge_tts` | `edge_tts` (online) or `piper` (offline) |
-| `TTS_VOICE` | `en-GB-SoniaNeural` | edge-tts voice id |
+| `TTS_PROVIDER` | `piper` | `piper` (offline, default) or `edge_tts` (online) |
+| `TTS_VOICE` | `en-GB-SoniaNeural` | edge-tts voice id (used only for `edge_tts`) |
 | `PIPER_VOICE` / `PIPER_MODELS_DIR` | `en_US-amy-medium` / `models` | piper voice + folder |
 | `STORAGE_PROVIDER` | `local` | `local` or `minio` |
 | `MEDIA_DIR` | `media` | Location of `books.json` + `books/` |

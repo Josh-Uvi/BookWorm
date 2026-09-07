@@ -55,10 +55,10 @@ The server needs an OpenAI-compatible LLM endpoint. Pick one:
 
 - **Hosted endpoint (simplest)** — Groq/OpenAI/vLLM service: set `GCP_LLM_BASE_URL` etc.
   Nothing else to run.
-- **Ollama sidecar (self-contained)** — bake the model into a custom image:
+- **Ollama sidecar (self-contained)** — bake the lightweight model into a custom image:
   ```dockerfile
   FROM ollama/ollama
-  RUN ollama pull llama3.2
+  RUN ollama pull llama3.2:1b
   ```
   Deploy it as a second Cloud Run service and point `LLM_BASE_URL` at its internal URL, or run
   it on a GCE VM / GKE for sustained load.

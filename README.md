@@ -10,8 +10,8 @@ credentials required:
 | Capability | Default implementation | Swap via |
 |---|---|---|
 | Speech-to-text | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (offline) | `STT_PROVIDER`, `WHISPER_MODEL` |
-| Help analysis (LLM) | [Ollama](https://ollama.com) — any OpenAI-compatible endpoint (vLLM, LM Studio, Groq, OpenAI…) | `LLM_BASE_URL`, `LLM_MODEL` |
-| Text-to-speech | [edge-tts](https://github.com/rany2/edge_tts) or [Piper](https://github.com/rhasspy/piper) (offline) | `TTS_PROVIDER`, `TTS_VOICE` |
+| Help analysis (LLM) | [Ollama](https://ollama.com) `llama3.2:1b` — any OpenAI-compatible endpoint (vLLM, LM Studio, Groq, OpenAI…) | `LLM_BASE_URL`, `LLM_MODEL` |
+| Text-to-speech | [Piper](https://github.com/rhasspy/piper) (offline, default) or [edge-tts](https://github.com/rany2/edge_tts) (online fallback) | `TTS_PROVIDER`, `PIPER_VOICE` / `TTS_VOICE` |
 | Book storage | Local folder or [MinIO](https://min.io) (S3-compatible) | `STORAGE_PROVIDER` |
 
 ```
@@ -19,7 +19,7 @@ credentials required:
 │ Client (React + Vite)     │ ── audio (base64) ──▶ │ Server (Python, asyncio)   │
 │ getUserMedia +            │                       │ faster-whisper STT         │
 │ MediaRecorder             │ ◀── transcript ────── │ Ollama LLM “needs help?”   │
-│ plays spoken help         │ ◀── help + MP3/WAV ── │ edge-tts / Piper TTS       │
+│ plays spoken help         │ ◀── help + MP3/WAV ── │ Piper / edge-tts TTS       │
 └───────────────────────────┘                       │ books: local / MinIO       │
         │  loads books.json + PDFs from /media      └────────────────────────────┘
         ▼
@@ -37,10 +37,10 @@ Then open **http://localhost:8080**, pick a book, press **“Read aloud”** and
 access. As you read (or pretend to struggle: *“I don’t know this word… help!”*), the live
 transcript appears in the sidebar and the assistant speaks an encouraging reply.
 
-> Heads-up on model size: `llama3.2` (the recommended default) needs an Ollama container with
-> **≥ 6 GB RAM**. On constrained machines (e.g. a default 2 GiB colima VM) use a smaller model
-> such as `qwen2.5:0.5b` — set `LLM_MODEL` and `OLLAMA_MODEL` in `.env`. See
-> [Troubleshooting](#troubleshooting).
+> Heads-up on model size: the default `llama3.2:1b` (~1.3 GB) needs an Ollama container with
+> **≥ 2 GB RAM** and is light enough for most machines. On very constrained hosts (e.g. a
+> default 2 GiB colima VM) use `qwen2.5:0.5b` (~400 MB) — set `LLM_MODEL` and `OLLAMA_MODEL`
+> in `.env`. See [Troubleshooting](#troubleshooting).
 
 ## Prerequisites
 
@@ -75,10 +75,10 @@ WHISPER_MODEL=base            # tiny | base | small | medium | large-v3
 
 # Language model — ANY OpenAI-compatible endpoint
 LLM_BASE_URL=http://localhost:11434/v1
-LLM_MODEL=llama3.2
+LLM_MODEL=llama3.2:1b         # lightweight 1B default; qwen2.5:0.5b for tiny VMs
 
-# Text-to-speech — zero-setup (online) or fully offline
-TTS_PROVIDER=edge_tts         # or: piper (offline; voice downloaded by `make setup`)
+# Text-to-speech — fully offline (default) or zero-setup online fallback
+TTS_PROVIDER=piper            # or: edge_tts (online; voice set via TTS_VOICE)
 ```
 
 Full reference: [docs/backend.md](docs/backend.md) · [docs/frontend.md](docs/frontend.md).
@@ -150,10 +150,10 @@ automated via GitHub Actions on `v*` tags (or manual dispatch):
 
 | Symptom | Fix |
 |---|---|
-| LLM errors like `llama-server process terminated: signal killed` | The model doesn't fit in RAM. Give Docker ≥ 6 GB (colima: `colima stop && colima start --memory 6 --cpu 4`) or use a smaller model (`LLM_MODEL=qwen2.5:0.5b`). |
+| LLM errors like `llama-server process terminated: signal killed` | The model doesn't fit in RAM. Give Docker ≥ 2 GB for `llama3.2:1b` (colima: `colima stop && colima start --memory 4 --cpu 4`) or use `LLM_MODEL=qwen2.5:0.5b` (~400 MB). |
+| Piper error “voice not found” | The Docker image bakes the voice in at build time; for **native** dev run `make setup` (downloads the voice to `Server/models`). |
 | `error while creating mount source path … operation not permitted` (macOS) | Docker can't bind-mount `~/Documents` (TCC). The default compose uses named volumes — that's fine. Prefer live host files? Grant Full Disk Access to your VM runtime, or use `docker-compose.bind.yml`. |
 | Microphone button disabled | The page must be served over `http://localhost` or HTTPS; `getUserMedia` is blocked on plain-HTTP LAN IPs. |
 | No transcript while reading | Check `make logs`; first run downloads the Whisper model (~150 MB). Speak a full sentence — audio is transcribed every `STT_FLUSH_INTERVAL` seconds. |
-| Piper error “voice not found” | Run `make setup` (downloads the voice) and restart with `make up` — voices are seeded into the container automatically. |
 | `docker compose` not found | The Makefile auto-detects; standalone `docker-compose` v2 also works. |
 
