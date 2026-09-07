@@ -79,6 +79,10 @@ LLM_MODEL=llama3.2:1b         # lightweight 1B default; qwen2.5:0.5b for tiny VM
 
 # Text-to-speech — fully offline (default) or zero-setup online fallback
 TTS_PROVIDER=piper            # or: edge_tts (online; voice set via TTS_VOICE)
+# Friendly voices for a child audience:
+#   piper:   en_US-amy-medium (default) · en_US-lessac-medium · en_GB-alan-low
+#   edge-tts (TTS_PROVIDER=edge_tts): en-US-AnaNeural (child voice) ·
+#   en-GB-SoniaNeural (teacher-like)
 ```
 
 Full reference: [docs/backend.md](docs/backend.md) · [docs/frontend.md](docs/frontend.md).

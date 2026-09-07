@@ -79,8 +79,8 @@ container header; the session retains it so buffer rotations stay decodable.
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | `http://localhost:11434/v1` / `ollama` / `llama3.2:1b` | endpoint + model (lightweight 1B default) |
 | `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` / `LLM_TIMEOUT` | `0.3` / `500` / `30` | inference settings |
 | `TTS_PROVIDER` | `piper` | `piper` (offline, default) or `edge_tts` (online) |
-| `TTS_VOICE` | `en-GB-SoniaNeural` | edge-tts voice id (used only for `edge_tts`) |
-| `PIPER_VOICE` / `PIPER_MODELS_DIR` | `en_US-amy-medium` / `models` | piper voice + folder |
+| `TTS_VOICE` | `en-GB-SoniaNeural` | edge-tts voice id — child-friendly: `en-US-AnaNeural` (child voice), `en-US-JennyNeural` |
+| `PIPER_VOICE` / `PIPER_MODELS_DIR` | `en_US-amy-medium` / `models` | piper voice + folder — friendlier alternatives: `en_US-lessac-medium`, `en_GB-alan-low` (browse [piper-voices](https://huggingface.co/rhasspy/piper-voices)) |
 | `STORAGE_PROVIDER` | `local` | `local` or `minio` |
 | `MEDIA_DIR` | `media` | Location of `books.json` + `books/` |
 | `MINIO_ENDPOINT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` / `MINIO_SECURE` | — | for `STORAGE_PROVIDER=minio` |
