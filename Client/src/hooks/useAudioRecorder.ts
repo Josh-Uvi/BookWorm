@@ -16,6 +16,42 @@ interface UseAudioRecorderOptions {
   timesliceMs?: number;
 }
 
+/**
+ * Why the microphone is unavailable, or null when capture is supported.
+ *
+ * The most common culprit is not an "unsupported browser" but an insecure
+ * origin: `navigator.mediaDevices` only exists in secure contexts
+ * (http://localhost:… / http://127.0.0.1:…, or any HTTPS origin) — on
+ * plain-HTTP LAN IPs (e.g. http://192.168.1.10:8080) it is undefined and
+ * getUserMedia can never run. The env params let tests simulate capabilities.
+ */
+export function micUnsupportedReason(
+  env: { secureContext?: boolean; getUserMedia?: boolean; mediaRecorder?: boolean } = {}
+): string | null {
+  const secureContext =
+    env.secureContext ?? (typeof window !== "undefined" ? window.isSecureContext : false);
+  const hasGetUserMedia =
+    env.getUserMedia ??
+    (typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia);
+  const hasMediaRecorder =
+    env.mediaRecorder ?? (typeof window !== "undefined" && "MediaRecorder" in window);
+
+  if (!secureContext) {
+    return (
+      "Microphone access requires a secure page — open the app at " +
+      "http://localhost:8080 (or serve it over HTTPS). Browsers block " +
+      "getUserMedia on plain-HTTP addresses such as LAN IPs."
+    );
+  }
+  if (!hasGetUserMedia) {
+    return "This browser does not support microphone capture (getUserMedia unavailable).";
+  }
+  if (!hasMediaRecorder) {
+    return "This browser does not support audio recording (MediaRecorder unavailable).";
+  }
+  return null;
+}
+
 export function useAudioRecorder({ onChunk, timesliceMs = 1000 }: UseAudioRecorderOptions) {
   const [isRecording, setIsRecording] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
@@ -25,10 +61,8 @@ export function useAudioRecorder({ onChunk, timesliceMs = 1000 }: UseAudioRecord
   const onChunkRef = useRef(onChunk);
   onChunkRef.current = onChunk;
 
-  const isSupported =
-    typeof navigator !== "undefined" &&
-    !!navigator.mediaDevices?.getUserMedia &&
-    typeof MediaRecorder !== "undefined";
+  const unsupportedReason = micUnsupportedReason();
+  const isSupported = unsupportedReason === null;
 
   const start = useCallback(async () => {
     if (recorderRef.current || !isSupported) return;
@@ -79,7 +113,7 @@ export function useAudioRecorder({ onChunk, timesliceMs = 1000 }: UseAudioRecord
   // Stop recording (and release the mic) when the component unmounts.
   useEffect(() => () => stop(), [stop]);
 
-  return { isRecording, isSupported, micError, start, stop };
+  return { isRecording, isSupported, unsupportedReason, micError, start, stop };
 }
 
 function blobToBase64(blob: Blob): Promise<string> {

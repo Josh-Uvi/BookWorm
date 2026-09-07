@@ -66,6 +66,7 @@ interface AssistantSidebarProps {
   status: AssistantStatus;
   isRecording: boolean;
   isSupported: boolean;
+  unsupportedReason: string | null;
   micError: string | null;
   lastError: string | null;
   transcript: TranscriptionEvent[];
@@ -79,6 +80,7 @@ const AssistantSidebar = ({
   status,
   isRecording,
   isSupported,
+  unsupportedReason,
   micError,
   lastError,
   transcript,
@@ -131,7 +133,8 @@ const AssistantSidebar = ({
         <p className="mt-2 text-xs text-muted-foreground">
           {isSupported
             ? "The assistant listens while you read and speaks up with encouragement if you get stuck."
-            : "This browser does not support microphone capture."}
+            : (unsupportedReason ??
+              "This browser does not support microphone capture.")}
         </p>
         {micError && <p className="mt-1 text-xs text-red-400">{micError}</p>}
         {lastError && <p className="mt-1 text-xs text-yellow-400">{lastError}</p>}
@@ -264,6 +267,7 @@ const Reading = () => {
             status={assistant.status}
             isRecording={recorder.isRecording}
             isSupported={recorder.isSupported}
+            unsupportedReason={recorder.unsupportedReason}
             micError={recorder.micError}
             lastError={assistant.lastError}
             transcript={assistant.transcript}
