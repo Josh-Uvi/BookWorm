@@ -1,0 +1,46 @@
+{
+  "family": "reading-assistant-server",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "containerDefinitions": [
+    {
+      "name": "server",
+      "image": "REPLACE_ME_ECR_SERVER_IMAGE",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 8765, "protocol": "tcp" },
+        { "containerPort": 8766, "protocol": "tcp" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -sf http://localhost:8765/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      },
+      "environment": [
+        { "name": "PORT", "value": "8765" },
+        { "name": "MEDIA_PORT", "value": "8766" },
+        { "name": "MEDIA_DIR", "value": "/data/media" },
+        { "name": "SERVE_MEDIA", "value": "true" },
+        { "name": "TTS_PROVIDER", "value": "edge_tts" },
+        { "name": "STT_PROVIDER", "value": "faster_whisper" },
+        { "name": "WHISPER_MODEL", "value": "base" },
+        { "name": "WHISPER_DEVICE", "value": "cpu" },
+        { "name": "LLM_BASE_URL", "value": "__LLM_BASE_URL__" },
+        { "name": "LLM_MODEL", "value": "__LLM_MODEL__" },
+        { "name": "LLM_API_KEY", "value": "__LLM_API_KEY__" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/reading-assistant-server",
+          "awslogs-region": "__AWS_REGION__",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

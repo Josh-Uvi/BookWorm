@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Date** | 2026-09-07 |
-| **Status** | Approved — ready for implementation |
+| **Status** | ✅ Implemented — see the git history for the milestone commits |
 | **Scope** | Platform-agnostic refactor · E2E client↔server integration · Docker + Make · Documentation · CI/CD & production (GCP/AWS) |
 
 ---

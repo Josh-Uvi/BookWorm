@@ -1,0 +1,101 @@
+name: Deploy to GCP
+
+# Server -> Cloud Run (WebSockets supported) · Client -> Cloud Storage + Cloud CDN.
+# See docs/deployment-gcp.md for the one-time setup (WIF, registry, secrets).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  server:
+    name: Server -> Artifact Registry -> Cloud Run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push server image
+        env:
+          REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/reading-assistant
+        run: |
+          TAG=${GITHUB_SHA::12}
+          docker build -t "$REGISTRY/server:$TAG" -t "$REGISTRY/server:latest" ./Server
+          docker push "$REGISTRY/server:$TAG"
+          docker push "$REGISTRY/server:latest"
+          echo "SERVER_IMAGE=$REGISTRY/server:$TAG" >> "$GITHUB_ENV"
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: reading-assistant-server
+          region: ${{ secrets.GCP_REGION }}
+          image: ${{ env.SERVER_IMAGE }}
+          flags: >-
+            --allow-unauthenticated
+            --port=8765
+            --cpu=2
+            --memory=4Gi
+            --min-instances=0
+            --max-instances=3
+          env: |
+            LLM_BASE_URL=${{ secrets.GCP_LLM_BASE_URL }}
+            LLM_MODEL=${{ secrets.GCP_LLM_MODEL }}
+            LLM_API_KEY=${{ secrets.GCP_LLM_API_KEY }}
+            MEDIA_DIR=/data/media
+            TTS_PROVIDER=edge_tts
+
+  client:
+    name: Client -> Cloud Storage (+ Cloud CDN)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Client/package-lock.json
+
+      - name: Install and build
+        working-directory: Client
+        env:
+          # Same-origin /ws by default — front both with one domain (see docs §6),
+          # or set this to wss://<cloud-run-or-lb-domain> at build time.
+          VITE_WS_URL: ${{ secrets.GCP_VITE_WS_URL }}
+        run: |
+          npm ci
+          npm run build
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload to Cloud Storage
+        run: |
+          gcloud storage rsync --recursive --delete-unmatched-destination-objects \
+            Client/dist "gs://${{ secrets.GCP_CLIENT_BUCKET }}"
+          echo "Client deployed to gs://${{ secrets.GCP_CLIENT_BUCKET }}"
+
+      - name: Invalidate Cloud CDN (optional)
+        if: ${{ secrets.GCP_LOAD_BALANCER != '' }}
+        run: |
+          gcloud compute url-maps invalidate-cdn-cache "${{ secrets.GCP_LOAD_BALANCER }}" \
+            --path "/*" --async || echo "CDN invalidation skipped (no load balancer configured)"

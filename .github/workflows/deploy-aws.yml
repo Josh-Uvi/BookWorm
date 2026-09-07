@@ -1,0 +1,100 @@
+name: Deploy to AWS
+
+# Server -> ECR -> ECS Fargate (behind an ALB with a WebSocket target group)
+# Client -> S3 + CloudFront. See docs/deployment-aws.md for the one-time setup.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  server:
+    name: Server -> ECR -> ECS Fargate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push server image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$REGISTRY/reading-assistant/server:$TAG" ./Server
+          docker push "$REGISTRY/reading-assistant/server:$TAG"
+
+      - name: Fill LLM settings into the task definition
+        env:
+          LLM_BASE_URL: ${{ secrets.AWS_LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.AWS_LLM_MODEL }}
+          LLM_API_KEY: ${{ secrets.AWS_LLM_API_KEY }}
+        run: |
+          sed -i.bak \
+            -e "s|__LLM_BASE_URL__|$LLM_BASE_URL|g" \
+            -e "s|__LLM_MODEL__|$LLM_MODEL|g" \
+            -e "s|__LLM_API_KEY__|$LLM_API_KEY|g" \
+            deploy/aws/ecs-task-definition.json
+
+      - name: Render task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: deploy/aws/ecs-task-definition.json
+          container-name: server
+          image: ${{ steps.ecr.outputs.registry }}/reading-assistant/server:${{ github.sha }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ secrets.AWS_ECS_SERVICE }}
+          cluster: ${{ secrets.AWS_ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+  client:
+    name: Client -> S3 + CloudFront
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Client/package-lock.json
+
+      - name: Install and build
+        working-directory: Client
+        env:
+          # Same-origin /ws by default (route /ws via the ALB), or override:
+          VITE_WS_URL: ${{ secrets.AWS_VITE_WS_URL }}
+        run: |
+          npm ci
+          npm run build
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Sync to S3
+        run: aws s3 sync Client/dist "s3://${{ secrets.AWS_S3_BUCKET }}" --delete
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"
