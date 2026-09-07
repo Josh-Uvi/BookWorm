@@ -67,14 +67,14 @@ class Settings:
     llm_provider: str = "ollama"
     llm_base_url: str = "http://localhost:11434/v1"
     llm_api_key: str = "ollama"          # required by the SDK; unused by local servers
-    llm_model: str = "llama3.2"
+    llm_model: str = "llama3.2:1b"      # lightweight 1B model (~1.3 GB; served by the ollama container)
     llm_temperature: float = 0.3
     llm_max_tokens: int = 500
     llm_timeout: float = 30.0
 
     # ── Text-to-speech (TTS_PROVIDER) ───────────────────────────────
-    tts_provider: str = "edge_tts"         # "edge_tts" (zero-setup) or "piper" (offline)
-    tts_voice: str = "en-GB-SoniaNeural"    # edge-tts voice id (ignored by piper)
+    tts_provider: str = "piper"             # "piper" (offline, containerized) or "edge_tts" (online)
+    tts_voice: str = "en-GB-SoniaNeural"    # edge-tts voice id (used only when TTS_PROVIDER=edge_tts)
     piper_voice: str = "en_US-amy-medium"   # piper voice name
     piper_models_dir: str = "models"        # folder containing <voice>.onnx
 

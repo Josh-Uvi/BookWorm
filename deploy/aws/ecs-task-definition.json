@@ -25,7 +25,7 @@
         { "name": "MEDIA_PORT", "value": "8766" },
         { "name": "MEDIA_DIR", "value": "/data/media" },
         { "name": "SERVE_MEDIA", "value": "true" },
-        { "name": "TTS_PROVIDER", "value": "edge_tts" },
+        { "name": "TTS_PROVIDER", "value": "piper" },
         { "name": "STT_PROVIDER", "value": "faster_whisper" },
         { "name": "WHISPER_MODEL", "value": "base" },
         { "name": "WHISPER_DEVICE", "value": "cpu" },

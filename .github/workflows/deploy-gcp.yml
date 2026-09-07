@@ -57,7 +57,7 @@ jobs:
             LLM_MODEL=${{ secrets.GCP_LLM_MODEL }}
             LLM_API_KEY=${{ secrets.GCP_LLM_API_KEY }}
             MEDIA_DIR=/data/media
-            TTS_PROVIDER=edge_tts
+            TTS_PROVIDER=piper
 
   client:
     name: Client -> Cloud Storage (+ Cloud CDN)

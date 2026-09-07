@@ -8,7 +8,7 @@ COMPOSE_IMPL := $(shell docker compose version >/dev/null 2>&1 && echo "docker c
 COMPOSE ?= $(COMPOSE_IMPL)
 PYTHON ?= python3
 SERVER_PYTHON ?= Server/.venv/bin/python
-OLLAMA_MODEL ?= llama3.2
+OLLAMA_MODEL ?= llama3.2:1b
 PIPER_VOICE ?= en_US-amy-medium
 
 .DEFAULT_GOAL := help
