@@ -72,7 +72,10 @@ def _make_handler(storage):
                     )
                     return
                 if path.startswith("/books/"):
-                    file_path = storage.resolve_file(path[len("/books/"):])
+                    # URL paths mirror the media root layout: /books/<file>
+                    # serves MEDIA_DIR/books/<file> (catalogue pdfUrl values
+                    # like "books/<file>.pdf" are root-relative).
+                    file_path = storage.resolve_file(path.lstrip("/"))
                     data = file_path.read_bytes()
                     media_type = CONTENT_TYPES.get(
                         file_path.suffix.lower(), "application/octet-stream"
