@@ -45,3 +45,28 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
 }
+
+// ── Reading assistant (WebSocket) types ──────────────────────────────
+
+export type AssistantStatus =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "error";
+
+export interface TranscriptionEvent {
+  text: string;
+  confidence: number | null;
+  isPartial: boolean;
+  timestamp: string;
+}
+
+export interface HelpEvent {
+  helpMessage: string;
+  audio?: string;
+  audioFormat?: string;
+  confidence?: number;
+  reason?: string;
+  timestamp: string;
+}

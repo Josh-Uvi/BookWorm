@@ -11,6 +11,17 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      // Same-origin defaults in dev: mirrors the Nginx setup in Docker.
+      "/ws": {
+        target: "http://localhost:8765",
+        ws: true,
+      },
+      "/media": {
+        target: "http://localhost:8766",
+        rewrite: (mediaPath) => mediaPath.replace(/^\/media/, ""),
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
@@ -19,3 +30,4 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }));
+
