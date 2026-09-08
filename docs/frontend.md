@@ -2,7 +2,8 @@
 
 React 18 single-page app (Vite + TypeScript + Tailwind CSS + shadcn/ui) that renders the
 library and the reading experience, captures microphone audio, and talks to the Python
-server over a native WebSocket.
+server over a native WebSocket. Chapter-based books also support browser-local read-along
+narration with synchronized word highlighting.
 
 ## Stack
 
@@ -26,12 +27,47 @@ The `Reading` page composes both hooks: `useAudioRecorder({ onChunk: assistant.s
 One mic toggle starts/stops streaming; the sidebar shows the transcript and the assistant's
 spoken help messages.
 
+Microphone controls are server-dependent: they are enabled only when the assistant status is
+`connected`, and active recording stops when the WebSocket drops. Connecting, reconnecting,
+idle, and error states all keep both the floating and sidebar mic controls disabled.
+
+## The read-along pipeline (browser-local)
+
+```
+chapter content → tokenizeSpeechText → SpeechSynthesisUtterance → selected narrator voice
+       │                                            │
+       └──── HighlightedText ← active token index ──┘
+```
+
+`useSpeechReader` runs entirely in the browser, so read-along remains available when the
+assistant server is offline. It ranks installed voices and prefers Natural, Neural, Premium,
+Google US English, Microsoft Aria/Jenny/Ana, and clear macOS narrators such as Samantha while
+deprioritizing novelty/robotic voices. Narration uses a calm `0.92` rate and natural pitch.
+
+Word synchronization uses `SpeechSynthesisUtterance.onboundary` when the browser provides it.
+For engines that do not emit reliable word boundaries, the fallback highlights the first word
+when audio starts, catches up from total elapsed narration time, and accounts for word length,
+speech rate, punctuation pauses, and timer drift.
+
+Read-along and reader font settings apply only to chapter-based books whose text is rendered
+in the app. PDF books are embedded in an iframe; the app cannot tokenize or restyle that
+cross-document text, so it hides the ineffective settings/read-along controls for PDFs.
+
+## Floating reader controls
+
+- The toolbar is collapsible to one compact expand button.
+- When the assistant sidebar is open, it moves left of the sidebar on desktop.
+- On small screens it moves above the sidebar footer, avoiding the **Clear transcript** button.
+- The microphone remains present for PDF books; only chapter-specific controls are hidden.
+
 ## Key modules
 
 | Module | Responsibility |
 |---|---|
 | `src/hooks/useAudioRecorder.ts` | Mic permission, MediaRecorder lifecycle, blob → base64, mime negotiation (`webm;codecs=opus` → fallbacks) |
-| `src/hooks/useReadingAssistant.ts` | WebSocket connection with exponential-backoff reconnect, transcript state, help playback, `resolveWsUrl()` |
+| `src/hooks/useReadingAssistant.ts` | WebSocket connection with exponential-backoff reconnect, connection-readiness rule, transcript state, help playback, `resolveWsUrl()` |
+| `src/hooks/useSpeechReader.ts` | Offline browser TTS, narrator voice ranking, native boundary tracking, and elapsed-time fallback synchronization |
+| `src/components/HighlightedText.tsx` | Word-token rendering, active/read styling, and auto-scroll during narration |
 | `src/services/wsMessages.ts` | Pure parser for server messages (unit-tested) |
 | `src/services/bookService.ts` | Loads `/media/books.json`; resolves relative `pdfUrl`s; falls back to bundled `sampleBooks` |
 | `src/pages/Reading.tsx` | PDF branch (iframe) and chapter branch + assistant sidebar & floating controls |
@@ -67,12 +103,14 @@ Notes:
 - `getUserMedia` requires a secure context — use `http://localhost:8080` or HTTPS.
 - Books without `pdfUrl` render the chapter branch (bundled sample books have chapters).
 - Books with `pdfUrl` render in an `<iframe>`; the PDF itself is served by the backend media
-  server, never from a third-party CDN.
+  server, never from a third-party CDN. Reader settings/read-along highlighting are hidden in
+  this branch because they cannot affect iframe content.
 
 ## Tests
 
 | File | Covers |
 |---|---|
 | `src/test/wsMessages.test.ts` | Server-message parsing: transcription / help / error / invalid / unknown |
-| `src/test/wsUrl.test.ts` | `resolveWsUrl` default and override behaviour |
+| `src/test/wsUrl.test.ts` | `resolveWsUrl` default/override behaviour and assistant-control readiness by connection status |
+| `src/test/speechReader.test.ts` | Tokenization, boundary mapping, voice ranking, punctuation-aware timing, and elapsed-time catch-up |
 | `src/test/bookService.test.ts` | Media fetch + `pdfUrl` resolution, sample fallback, empty catalogue |

@@ -10,6 +10,11 @@ import { AssistantStatus, HelpEvent, TranscriptionEvent } from "@/types";
 const RECONNECT_BASE_DELAY_MS = 1000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+/** Assistant-backed controls are usable only after the WebSocket opens. */
+export function isAssistantReady(status: AssistantStatus): boolean {
+  return status === "connected";
+}
+
 /** Same-origin `/ws` by default — works with the Vite dev proxy, the Nginx
  * container, and any TLS-terminating load balancer in production. */
 export function resolveWsUrl(explicitUrl?: string): string {

@@ -350,6 +350,16 @@ faster-whisper / CTranslate2 / onnxruntime / piper. Dev extras (`requirements-de
 2. Add a **live transcript strip** showing partial/final transcriptions.
 3. Add an **assistant panel** that shows `help_needed` messages while the child reads.
 4. Remove the fake `setTimeout` chat bot; keep the chat UI shell as a future feature.
+5. Add a browser-local **read-along** control for chapter books using `speechSynthesis`, with a
+   preferred clear/natural narrator voice and synchronized per-word highlighting. Native word
+   boundaries are preferred; an elapsed-time, word-length, rate, and punctuation-aware fallback
+   keeps engines without boundary events in sync.
+6. Keep read-along available when the server is offline, but disable both microphone controls
+   unless the WebSocket status is `connected`; stop active recording if the connection drops.
+7. Make the floating controls collapsible and position them left of the assistant sidebar (or
+   above its footer on small screens) so they do not cover **Clear transcript**.
+8. Hide reader settings and highlighted read-along controls for iframe/PDF books because those
+   controls cannot modify or tokenize the embedded PDF document.
 
 ### 6.3 Book data — de-CloudFront
 

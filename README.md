@@ -48,6 +48,21 @@ Then open **http://localhost:8080**, pick a book, press **“Read aloud”** and
 access. As you read (or pretend to struggle: *“I don’t know this word… help!”*), the live
 transcript appears in the sidebar and the assistant speaks an encouraging reply.
 
+### Reading controls
+
+- **Microphone / “Read aloud — I'm listening”** streams the child's voice to the reading
+  assistant. Both microphone controls are disabled while the WebSocket is connecting,
+  reconnecting, offline, or in an error state; active recording stops if the connection drops.
+- **Headphones / read-along** narrates chapter-based books locally with the browser's Web
+  Speech API, highlights the current word, and works even when the server is offline. It selects
+  a clear natural/premium voice when available and uses an elapsed-time, punctuation-aware
+  fallback on browsers that do not emit word-boundary events.
+- The floating controls can be collapsed. When the assistant panel is open, the toolbar moves
+  left (or above the footer on small screens) so it does not cover **Clear transcript**.
+- **Reader settings** is shown only for chapter-based books, where font size affects the page.
+  PDF books render inside an iframe, so the settings and highlighted read-along controls are
+  hidden because the app cannot restyle or tokenize the embedded PDF text.
+
 > Heads-up on model size: the default `qwen2.5:3b` (~2 GB weights, ~4 GB RAM to run) is too
 > big for Docker Desktop's default ~2 GB VM — the Ollama container gets OOM-killed. Either
 > raise the VM memory, point the server at a host-native Ollama via `LLM_BASE_URL_DOCKER`
@@ -110,7 +125,8 @@ running, `make up` / `make seed` copies them into the media volume automatically
 ```
 .
 ├── Client/               # React 18 + Vite + TS + Tailwind + shadcn/ui
-│   ├── src/hooks/        #   useAudioRecorder, useReadingAssistant
+│   ├── src/hooks/        #   useAudioRecorder, useReadingAssistant, useSpeechReader
+│   ├── src/components/   #   HighlightedText + shared UI components
 │   ├── src/pages/        #   Landing, Interests, Reading, Profile
 │   ├── src/services/     #   bookService, wsMessages
 │   ├── Dockerfile        #   node build → nginx (proxies /ws, /media)
@@ -169,7 +185,9 @@ automated via GitHub Actions on `v*` tags (or manual dispatch):
 | LLM errors like `llama-server process terminated: signal killed` | The model doesn't fit in RAM: `qwen2.5:3b` needs ~4 GB (the Docker Desktop default VM has ~2 GB). Give Docker more memory (Docker Desktop → Settings → Resources; colima: `colima stop && colima start --memory 4 --cpu 4`), or set `LLM_BASE_URL_DOCKER=http://host.docker.internal:11434/v1` to use a host-native Ollama, or use `LLM_MODEL=qwen2.5:1.5b` (~1 GB). |
 | Piper error “voice not found” | The Docker image bakes the voice in at build time; for **native** dev run `make setup` (downloads the voice to `Server/models`). |
 | `error while creating mount source path … operation not permitted` (macOS) | Docker can't bind-mount `~/Documents` (TCC). The default compose uses named volumes — that's fine. Prefer live host files? Grant Full Disk Access to your VM runtime, or use `docker-compose.bind.yml`. |
-| Microphone button disabled | The page must be served over `http://localhost` or HTTPS; `getUserMedia` is blocked on plain-HTTP LAN IPs. |
+| Microphone button disabled | The assistant WebSocket must be connected, and the page must be served over `http://localhost` or HTTPS; `getUserMedia` is blocked on plain-HTTP LAN IPs. Read-along narration remains available offline because it runs entirely in the browser. |
+| Read-along voice sounds robotic | Install/download a higher-quality system voice if the browser exposes only compact voices. The app prefers Natural, Neural, Premium, Google, Microsoft Aria/Jenny/Ana, and clear macOS voices such as Samantha. |
+| Read-along highlighting drifts | Native word-boundary events are used when available; otherwise the app uses elapsed-time, word-length, speech-rate, and punctuation-aware timing. Restart narration after changing operating-system voices. |
 | No transcript while reading | Check `make logs`; first run downloads the Whisper model (~150 MB). Speak a full sentence — audio is transcribed every `STT_FLUSH_INTERVAL` seconds. |
 | `docker compose` not found | The Makefile auto-detects; standalone `docker-compose` v2 also works. |
 

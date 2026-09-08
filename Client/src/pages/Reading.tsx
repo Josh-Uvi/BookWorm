@@ -31,7 +31,7 @@ import { Slider } from "@/components/ui/slider";
 import HighlightedText from "@/components/HighlightedText";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { useReadingAssistant } from "@/hooks/useReadingAssistant";
+import { isAssistantReady, useReadingAssistant } from "@/hooks/useReadingAssistant";
 import { tokenizeSpeechText, useSpeechReader } from "@/hooks/useSpeechReader";
 import { useToast } from "@/hooks/use-toast";
 import { fetchReadableBook } from "@/services/bookService";
@@ -202,6 +202,7 @@ const Reading = () => {
 
   const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
   const [isAssistantOpen, setIsAssistantOpen] = useState(true);
+  const [areControlsCollapsed, setAreControlsCollapsed] = useState(false);
   const [preferences] = useLocalStorage<UserPreferences>("user-preferences", defaultPreferences);
   const [, setReadingHistory] = useLocalStorage<ReadingProgress[]>("reading-history", []);
   const [localFontSize, setLocalFontSize] = useState(preferences.fontSize);
@@ -209,6 +210,9 @@ const Reading = () => {
   const assistant = useReadingAssistant();
   const recorder = useAudioRecorder({ onChunk: assistant.sendAudio });
   const speech = useSpeechReader();
+  const isAssistantConnected = isAssistantReady(assistant.status);
+  const isRecording = recorder.isRecording;
+  const stopRecording = recorder.stop;
 
   useEffect(() => {
     const loadBook = async () => {
@@ -269,7 +273,7 @@ const Reading = () => {
   const toggleMic = () => {
     if (recorder.isRecording) {
       recorder.stop();
-    } else {
+    } else if (isAssistantConnected) {
       void recorder.start();
     }
   };
@@ -284,6 +288,13 @@ const Reading = () => {
     if (recorder.isRecording) recorder.stop();
     speech.start(currentChapter.content, chapterTokens);
   };
+
+  // A connection loss makes microphone listening unavailable, but read-along
+  // narration is browser-local and must keep working offline.
+  useEffect(() => {
+    if (isAssistantConnected) return;
+    if (isRecording) stopRecording();
+  }, [isAssistantConnected, isRecording, stopRecording]);
 
   // Stop the read-along narration when the chapter or book changes.
   useEffect(() => {
@@ -315,8 +326,12 @@ const Reading = () => {
           <AssistantSidebar
             status={assistant.status}
             isRecording={recorder.isRecording}
-            isSupported={recorder.isSupported}
-            unsupportedReason={recorder.unsupportedReason}
+            isSupported={recorder.isSupported && isAssistantConnected}
+            unsupportedReason={
+              !isAssistantConnected
+                ? "Microphone controls are unavailable until the assistant reconnects."
+                : recorder.unsupportedReason
+            }
             micError={recorder.micError}
             lastError={assistant.lastError}
             transcript={assistant.transcript}
@@ -331,96 +346,145 @@ const Reading = () => {
   );
 
   const floatingControls = (
-    <div className="fixed bottom-6 right-6 flex gap-2 z-40">
-      {!isAssistantOpen && (
-        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-          <Button
-            onClick={() => setIsAssistantOpen(true)}
-            className="h-12 w-12 rounded-full bg-primary shadow-lg hover-glow"
-            aria-label="Open assistant"
+    <div
+      role="toolbar"
+      aria-label="Reader controls"
+      className={`fixed z-40 flex items-center gap-2 transition-all duration-300 ${
+        isAssistantOpen
+          ? "bottom-24 left-4 md:bottom-6 md:left-auto md:right-[21.5rem]"
+          : "bottom-6 right-6"
+      }`}
+    >
+      <AnimatePresence initial={false}>
+        {!areControlsCollapsed && (
+          <motion.div
+            key="reader-controls"
+            initial={{ opacity: 0, scale: 0.9, x: 12 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            exit={{ opacity: 0, scale: 0.9, x: 12 }}
+            className="flex items-center gap-2"
           >
-            <MessageSquare className="h-5 w-5" />
-          </Button>
-        </motion.div>
-      )}
-      {!book?.pdfUrl && currentChapter && (
-        <Button
-          onClick={toggleReadAlong}
-          disabled={!speech.isSupported}
-          aria-label={speech.isReading ? "Stop read-along" : "Read the story aloud"}
-          title={
-            speech.isSupported
-              ? speech.isReading
-                ? "Stop read-along"
-                : "Read the story aloud with word highlighting"
-              : (speech.unsupportedReason ?? "Text-to-speech unavailable")
-          }
-          className={`h-12 w-12 rounded-full shadow-lg ${
-            speech.isReading ? "bg-red-500 hover:bg-red-600" : "bg-primary hover-glow"
-          }`}
-        >
-          {speech.isReading ? <Square className="h-5 w-5" /> : <Headphones className="h-5 w-5" />}
-        </Button>
-      )}
+            {!isAssistantOpen && (
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                <Button
+                  onClick={() => setIsAssistantOpen(true)}
+                  className="h-12 w-12 rounded-full bg-primary shadow-lg hover-glow"
+                  aria-label="Open assistant"
+                >
+                  <MessageSquare className="h-5 w-5" />
+                </Button>
+              </motion.div>
+            )}
+            {!book?.pdfUrl && currentChapter && (
+              <Button
+                onClick={toggleReadAlong}
+                disabled={!speech.isSupported}
+                aria-label={speech.isReading ? "Stop read-along" : "Read the story aloud"}
+                title={
+                  speech.isSupported
+                    ? speech.isReading
+                      ? "Stop read-along"
+                      : "Read the story aloud with word highlighting"
+                    : (speech.unsupportedReason ?? "Text-to-speech unavailable")
+                }
+                className={`h-12 w-12 rounded-full shadow-lg ${
+                  speech.isReading ? "bg-red-500 hover:bg-red-600" : "bg-primary hover-glow"
+                }`}
+              >
+                {speech.isReading ? (
+                  <Square className="h-5 w-5" />
+                ) : (
+                  <Headphones className="h-5 w-5" />
+                )}
+              </Button>
+            )}
+            <Button
+              onClick={toggleMic}
+              disabled={!recorder.isSupported || !isAssistantConnected}
+              aria-label={recorder.isRecording ? "Stop reading aloud" : "Start reading aloud"}
+              title={
+                !isAssistantConnected
+                  ? "Microphone is unavailable until the assistant reconnects"
+                  : (recorder.unsupportedReason ?? "Start reading aloud")
+              }
+              className={`h-12 w-12 rounded-full shadow-lg ${
+                recorder.isRecording ? "bg-red-500 hover:bg-red-600" : "bg-primary hover-glow"
+              }`}
+            >
+              {recorder.isRecording ? (
+                <MicOff className="h-5 w-5" />
+              ) : (
+                <Mic className="h-5 w-5" />
+              )}
+            </Button>
+            {!book?.pdfUrl && currentChapter && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-12 w-12 rounded-full border-border shadow-lg"
+                    aria-label="Reader settings"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="bg-card border-border">
+                  <SheetHeader>
+                    <SheetTitle className="text-foreground">Reader Settings</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6 space-y-6">
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-4 block">
+                        Font Size: {localFontSize}px
+                      </label>
+                      <div className="flex items-center gap-4">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setLocalFontSize((prev) => Math.max(12, prev - 2))}
+                          className="border-border"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Slider
+                          value={[localFontSize]}
+                          onValueChange={(value) => setLocalFontSize(value[0])}
+                          min={12}
+                          max={24}
+                          step={1}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setLocalFontSize((prev) => Math.min(24, prev + 2))}
+                          className="border-border"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <Button
-        onClick={toggleMic}
-        disabled={!recorder.isSupported}
-        aria-label={recorder.isRecording ? "Stop reading aloud" : "Start reading aloud"}
-        className={`h-12 w-12 rounded-full shadow-lg ${
-          recorder.isRecording ? "bg-red-500 hover:bg-red-600" : "bg-primary hover-glow"
-        }`}
+        type="button"
+        variant="outline"
+        onClick={() => setAreControlsCollapsed((collapsed) => !collapsed)}
+        className="h-10 w-10 shrink-0 rounded-full border-border bg-card/90 shadow-lg backdrop-blur"
+        aria-label={areControlsCollapsed ? "Expand reader controls" : "Collapse reader controls"}
+        title={areControlsCollapsed ? "Expand reader controls" : "Collapse reader controls"}
       >
-        {recorder.isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+        {areControlsCollapsed ? (
+          <ChevronLeft className="h-4 w-4" />
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )}
       </Button>
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button
-            variant="outline"
-            className="h-12 w-12 rounded-full border-border shadow-lg"
-            aria-label="Reader settings"
-          >
-            <Settings className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent className="bg-card border-border">
-          <SheetHeader>
-            <SheetTitle className="text-foreground">Reader Settings</SheetTitle>
-          </SheetHeader>
-          <div className="mt-6 space-y-6">
-            <div>
-              <label className="text-sm font-medium text-foreground mb-4 block">
-                Font Size: {localFontSize}px
-              </label>
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setLocalFontSize((prev) => Math.max(12, prev - 2))}
-                  className="border-border"
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <Slider
-                  value={[localFontSize]}
-                  onValueChange={(value) => setLocalFontSize(value[0])}
-                  min={12}
-                  max={24}
-                  step={1}
-                  className="flex-1"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setLocalFontSize((prev) => Math.min(24, prev + 2))}
-                  className="border-border"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 

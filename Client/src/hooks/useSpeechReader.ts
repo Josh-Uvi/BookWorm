@@ -18,10 +18,16 @@ export interface SpeechToken {
   isWord: boolean;
 }
 
-/** Estimated narration speed at rate 1.0 (≈155 words per minute). */
-const FALLBACK_WORDS_PER_SECOND = 2.6;
+/** Calibrated browser narration speed at rate 1.0 (≈195 words per minute). */
+const FALLBACK_WORDS_PER_SECOND = 3.25;
 /** How long to wait for a boundary event before switching to estimation. */
-const BOUNDARY_GRACE_MS = 1000;
+const BOUNDARY_GRACE_MS = 700;
+
+export interface SpeechTimingPoint {
+  tokenIndex: number;
+  startMs: number;
+  durationMs: number;
+}
 
 /**
  * Why read-along is unavailable, or null when speechSynthesis is supported.
@@ -82,20 +88,152 @@ export function findWordIndexAtChar(tokens: SpeechToken[], charIndex: number): n
   return null;
 }
 
+/**
+ * Estimate how long a spoken word occupies in the narration. Word length and
+ * punctuation matter: "a" is quicker than "automatically", while commas and
+ * sentence endings introduce audible pauses. This is used only on browsers
+ * that don't provide native word-boundary events.
+ */
+export function estimateWordDurationMs(word: string, rate: number = 1): number {
+  const safeRate = Math.max(rate, 0.1);
+  const baseWordMs = 1000 / (FALLBACK_WORDS_PER_SECOND * safeRate);
+  const letterCount = Math.max((word.match(/[\p{L}\p{N}]/gu) ?? []).length, 1);
+  const lengthFactor = Math.min(1.28, Math.max(0.78, 0.78 + (letterCount - 1) * 0.05));
+
+  let punctuationPauseMs = 0;
+  if (/[.!?]["')\]]*$/.test(word)) punctuationPauseMs = 220 / safeRate;
+  else if (/[,;:]["')\]]*$/.test(word)) punctuationPauseMs = 110 / safeRate;
+  else if (/[—–-]["')\]]*$/.test(word)) punctuationPauseMs = 90 / safeRate;
+
+  return Math.round(baseWordMs * lengthFactor + punctuationPauseMs);
+}
+
+/** Build an elapsed-time schedule for word highlights. */
+export function buildSpeechTimeline(
+  tokens: SpeechToken[],
+  rate: number = 1
+): SpeechTimingPoint[] {
+  const timeline: SpeechTimingPoint[] = [];
+  let startMs = 0;
+  tokens.forEach((token, tokenIndex) => {
+    if (!token.isWord) return;
+    const durationMs = estimateWordDurationMs(token.text, rate);
+    timeline.push({ tokenIndex, startMs, durationMs });
+    startMs += durationMs;
+  });
+  return timeline;
+}
+
+/** Find the word that should be active at a given elapsed narration time. */
+export function findTimingPointAtElapsed(
+  timeline: SpeechTimingPoint[],
+  elapsedMs: number
+): number | null {
+  if (!timeline.length) return null;
+  const elapsed = Math.max(elapsedMs, 0);
+  let lo = 0;
+  let hi = timeline.length - 1;
+  let result = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (timeline[mid].startMs <= elapsed) {
+      result = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return result;
+}
+
 interface UseSpeechReaderStartOptions {
-  /** Speech rate — 1.0 is the engine default. Defaults to a child-friendly 0.95. */
+  /** Speech rate — 1.0 is the engine default. Defaults to a clear storytelling pace. */
   rate?: number;
   /** BCP-47 language tag used to pick a voice. Defaults to "en-US". */
   lang?: string;
 }
 
-function pickVoice(lang: string): SpeechSynthesisVoice | null {
-  const voices = window.speechSynthesis.getVoices();
-  return (
-    voices.find((voice) => voice.lang === lang) ??
-    voices.find((voice) => voice.lang.startsWith(lang.split("-")[0] ?? lang)) ??
-    null
-  );
+/**
+ * Friendly, clear narrator voices for child-facing storytelling, ranked.
+ * Natural/Neural/Premium voices (Chrome's "Google …", Edge's "… (Natural)",
+ * macOS "… (Premium)") sound dramatically better than the compact system
+ * defaults; classic robotic/novelty voices are pushed to the bottom.
+ */
+const NARRATOR_VOICE_NAME_BONUS: Record<string, number> = {
+  "google us english": 90, // Chrome — natural neural voice
+  "microsoft aria": 70, // Edge natural voice, warm and clear
+  "microsoft jenny": 70,
+  "microsoft ana": 70, // child voice
+  samantha: 60, // macOS default — pleasant and clear
+  serena: 50,
+  tessa: 50,
+  karen: 50,
+  moira: 50,
+  ava: 50,
+  allison: 50,
+  alice: 50,
+};
+
+// Robotic (old SAPI) or novelty system voices — only as a last resort.
+const ROBOTIC_VOICE_NAMES = [
+  "zarvox", "whisper", "bahh", "bells", "bubbles", "cellos", "jester",
+  "organ", "pipes", "superstar", "trinoids", "wobble", "albert",
+  "bad news", "good news", "junior", "ralph", "fred",
+  "microsoft david", "microsoft zira", "microsoft mark",
+];
+
+/** Higher is friendlier for narration; pure so it is unit-testable. */
+export function scoreNarratorVoice(
+  voice: SpeechSynthesisVoice,
+  requestedLang: string = "en-US"
+): number {
+  const name = voice.name.toLowerCase();
+  let score = 0;
+
+  // Higher-quality variants of any voice are the single biggest upgrade.
+  if (/(natural|premium|enhanced|neural)/.test(name)) score += 100;
+  if (name.startsWith("google ")) score += 80;
+
+  for (const [needle, bonus] of Object.entries(NARRATOR_VOICE_NAME_BONUS)) {
+    if (name.includes(needle)) {
+      score += bonus;
+      break;
+    }
+  }
+  for (const needle of ROBOTIC_VOICE_NAMES) {
+    if (name.includes(needle)) {
+      score -= 120;
+      break;
+    }
+  }
+
+  // Strongly prefer the requested locale, then the same language family.
+  const language = (voice.lang || "").toLowerCase().replace("_", "-");
+  const requested = requestedLang.toLowerCase().replace("_", "-");
+  const requestedFamily = requested.split("-")[0];
+  if (language === requested) score += 30;
+  else if (language.startsWith(requestedFamily)) score += 15;
+  else score -= 200;
+
+  return score;
+}
+
+/** Pick the friendliest available voice for the requested language. */
+export function pickNarratorVoice(
+  voices: SpeechSynthesisVoice[],
+  lang: string = "en-US"
+): SpeechSynthesisVoice | null {
+  if (!voices.length) return null;
+  let best: SpeechSynthesisVoice | null = null;
+  let bestScore = -Infinity;
+  for (const voice of voices) {
+    const score = scoreNarratorVoice(voice, lang);
+    if (score > bestScore) {
+      best = voice;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 export function useSpeechReader() {
@@ -142,12 +280,17 @@ export function useSpeechReader() {
       seenBoundaryRef.current = false;
 
       const utterance = new SpeechSynthesisUtterance(text);
-      const rate = options.rate ?? 0.95;
+      const rate = options.rate ?? 0.92;
       const lang = options.lang ?? "en-US";
       utterance.rate = rate;
+      // Keep a natural pitch; voice quality and a calm pace are clearer than
+      // artificially raising the pitch, which can sound thin or robotic.
+      utterance.pitch = 1;
       utterance.lang = lang;
-      const voice = pickVoice(lang);
+      const voice = pickNarratorVoice(window.speechSynthesis.getVoices(), lang);
       if (voice) utterance.voice = voice;
+      const fallbackTimeline = buildSpeechTimeline(tokens, rate);
+      let speechStartedAt: number | null = null;
 
       const finish = () => {
         // Ignore events from an utterance we already stopped or replaced.
@@ -162,8 +305,49 @@ export function useSpeechReader() {
       utterance.onboundary = (event) => {
         if (event.name && event.name !== "word") return;
         seenBoundaryRef.current = true;
+        clearFallbackTimer();
         const index = findWordIndexAtChar(tokensRef.current, event.charIndex);
         if (index !== null) setActiveWordIndex(index);
+      };
+      utterance.onstart = () => {
+        if (utteranceRef.current !== utterance || generationRef.current !== generation) return;
+        speechStartedAt = performance.now();
+
+        // Highlight the first word as soon as audio actually begins. The old
+        // fallback waited for the grace period plus one interval, which put
+        // the UI more than a second behind the narrator.
+        if (fallbackTimeline.length) {
+          setActiveWordIndex(fallbackTimeline[0].tokenIndex);
+        }
+
+        const syncFallbackToElapsedTime = () => {
+          if (
+            seenBoundaryRef.current ||
+            generationRef.current !== generation ||
+            speechStartedAt === null
+          ) {
+            return;
+          }
+
+          const elapsedMs = performance.now() - speechStartedAt;
+          const pointIndex = findTimingPointAtElapsed(fallbackTimeline, elapsedMs);
+          if (pointIndex === null) return;
+
+          const point = fallbackTimeline[pointIndex];
+          setActiveWordIndex(point.tokenIndex);
+
+          const nextPoint = fallbackTimeline[pointIndex + 1];
+          if (!nextPoint) return;
+          // Schedule against the original speech start time, not relative to
+          // the last tick. This prevents timer drift from accumulating.
+          const delayMs = Math.max(16, nextPoint.startMs - elapsedMs);
+          fallbackTimerRef.current = window.setTimeout(syncFallbackToElapsedTime, delayMs);
+        };
+
+        fallbackTimerRef.current = window.setTimeout(
+          syncFallbackToElapsedTime,
+          BOUNDARY_GRACE_MS
+        );
       };
       utterance.onend = finish;
       utterance.onerror = finish;
@@ -171,25 +355,6 @@ export function useSpeechReader() {
       utteranceRef.current = utterance;
       setIsReading(true);
       window.speechSynthesis.speak(utterance);
-
-      // Fallback for engines that never fire boundary events: if none arrive
-      // shortly after playback starts, advance the highlight on a timer.
-      fallbackTimerRef.current = window.setTimeout(() => {
-        if (seenBoundaryRef.current || generationRef.current !== generation) return;
-        const wordIndices = tokens
-          .map((token, index) => (token.isWord ? index : -1))
-          .filter((index) => index >= 0);
-        const perWordMs = 1000 / (FALLBACK_WORDS_PER_SECOND * rate);
-        let i = 0;
-        const tick = () => {
-          if (seenBoundaryRef.current || generationRef.current !== generation) return;
-          if (i >= wordIndices.length) return;
-          setActiveWordIndex(wordIndices[i]);
-          i += 1;
-          fallbackTimerRef.current = window.setTimeout(tick, perWordMs);
-        };
-        fallbackTimerRef.current = window.setTimeout(tick, perWordMs);
-      }, BOUNDARY_GRACE_MS);
     },
     [isSupported, stop, clearFallbackTimer]
   );
@@ -204,6 +369,20 @@ export function useSpeechReader() {
 
   // Stop speaking when the component unmounts.
   useEffect(() => () => stop(), [stop]);
+
+  // Warm the voice list: Chrome (and some other engines) populate
+  // getVoices() asynchronously via the voiceschanged event — without this
+  // the very first narration would fall back to the robotic default voice.
+  useEffect(() => {
+    if (!isSupported) return;
+    const synth = window.speechSynthesis;
+    const warm = () => {
+      synth.getVoices();
+    };
+    synth.addEventListener?.("voiceschanged", warm);
+    warm();
+    return () => synth.removeEventListener?.("voiceschanged", warm);
+  }, [isSupported]);
 
   return { isReading, activeWordIndex, isSupported, unsupportedReason, start, stop, toggle };
 }
