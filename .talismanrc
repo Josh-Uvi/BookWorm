@@ -68,7 +68,7 @@ fileignoreconfig:
 - filename: Client/src/components/BookSelection.tsx
   checksum: 01c86196d5d9db51be89b6c2d2cefa5b4914523a3d5e33ba8906eec5e8dadb29
 - filename: README.md
-  checksum: 287ba66c4a6155664a656eb7252e322fe156edfd758b95997cee93df79b3438c
+  checksum: f56c1d6dc0b9fa6d5d4a40a545f4268a9c952ec70f2aa32074f658ac8e180e88
 - filename: Client/bun.lockb
   checksum: de0504031b3f5ef43e2151fcdfb4a9d06bf0e8b34c0a68db4fd1a9f0da1382cc
 - filename: docs/assets/reading-assistant-flow-demo.mp4
@@ -77,4 +77,6 @@ fileignoreconfig:
   checksum: d793f4c8ae4e79a985a30a67fe5c862f3c987f57da0421e019c281f9eb7fc093
 - filename: docs/assets/02-book-selection.png
   checksum: 25d6144f7a7c3da5d0e98acbd4395c418443b5b0d617ea97e2c290bcf64270ac
+- filename: docs/assets/reading-assistant-flow-demo.gif
+  checksum: e03c0812ec99b44c5308e2713d6f606d12fb0e8a1b5485d51a72b67607a0ba73
 version: "1.0"
