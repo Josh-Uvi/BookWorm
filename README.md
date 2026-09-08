@@ -44,13 +44,25 @@ make setup   # .env, Python venv, Ollama model + Piper voice
 make up      # build & start server, client and Ollama
 ```
 
-Then open **http://localhost:8080**, pick a book, press **“Read aloud”** and grant microphone
+Then open **http://localhost:8080**, choose a student and book, press **“Start Reading Session”** and grant microphone
 access. As you read (or pretend to struggle: *“I don’t know this word… help!”*), the live
 transcript appears in the sidebar and the assistant speaks an encouraging reply.
 
+### Student reading flow
+
+The default route now guides children through **Student Login → Level-based Book Selection →
+Reading Session**. StudentA receives Level 2 beginning-reader support with the Tiffany voice,
+while StudentB receives Level 3 comprehension support with the Amy voice. Book metadata comes
+from `GET /api/books?level=2|3`, backed by PostgreSQL in Docker and built-in mock data when the
+database or API is unavailable.
+
+The reading route is session-protected and intentionally omitted from the navbar. During an
+active student session, the navbar shows that student's profile and disables the Bookworm home
+link; use **Switch Student** inside the reading session to clear the session.
+
 ### Reading controls
 
-- **Microphone / “Read aloud — I'm listening”** streams the child's voice to the reading
+- **Microphone / “Start Reading Session”** streams the child's voice to the reading
   assistant. Both microphone controls are disabled while the WebSocket is connecting,
   reconnecting, offline, or in an error state; active recording stops if the connection drops.
 - **Headphones / read-along** narrates chapter-based books locally with the browser's Web

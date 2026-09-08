@@ -69,7 +69,10 @@ cross-document text, so it hides the ineffective settings/read-along controls fo
 | `src/hooks/useSpeechReader.ts` | Offline browser TTS, narrator voice ranking, native boundary tracking, and elapsed-time fallback synchronization |
 | `src/components/HighlightedText.tsx` | Word-token rendering, active/read styling, and auto-scroll during narration |
 | `src/services/wsMessages.ts` | Pure parser for server messages (unit-tested) |
-| `src/services/bookService.ts` | Loads `/media/books.json`; resolves relative `pdfUrl`s; falls back to bundled `sampleBooks` |
+| `src/components/StudentLogin.tsx` | Child-friendly StudentA/StudentB reading-profile login |
+| `src/components/BookSelection.tsx` | Level-filtered book cards, loading/error states, and single selection |
+| `src/contexts/ReadingFlowContext.tsx` | Shared, session-persisted student/book state used by `/`, `/reading`, the navbar, and profile page |
+| `src/services/bookService.ts` | Loads `/api/books?level=X` and `/media/books.json`; resolves media URLs; provides bundled fallback data |
 | `src/pages/Reading.tsx` | PDF branch (iframe) and chapter branch + assistant sidebar & floating controls |
 | `src/types/index.ts` | Domain types incl. `TranscriptionEvent`, `HelpEvent`, `AssistantStatus` |
 
@@ -79,6 +82,7 @@ cross-document text, so it hides the ineffective settings/read-along controls fo
 |---|---|---|
 | `VITE_WS_URL` | *(same-origin `/ws`)* | WebSocket endpoint override (`ws://host:8765`) |
 | `VITE_MEDIA_URL` | `/media` | Media root for `books.json` + PDFs |
+| `VITE_API_URL` | `/api` | Reading-level books API root |
 
 The same-origin defaults work everywhere because the proxies match:
 
