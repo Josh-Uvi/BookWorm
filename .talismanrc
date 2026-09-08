@@ -68,7 +68,7 @@ fileignoreconfig:
 - filename: Client/src/components/BookSelection.tsx
   checksum: 01c86196d5d9db51be89b6c2d2cefa5b4914523a3d5e33ba8906eec5e8dadb29
 - filename: README.md
-  checksum: 45ff646628170cc92d3287e35af021aacb04f7487fb4f04f530b2b76244ff58b
+  checksum: 287ba66c4a6155664a656eb7252e322fe156edfd758b95997cee93df79b3438c
 - filename: Client/bun.lockb
   checksum: de0504031b3f5ef43e2151fcdfb4a9d06bf0e8b34c0a68db4fd1a9f0da1382cc
 - filename: docs/assets/reading-assistant-flow-demo.mp4
