@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseServerMessage } from "@/services/wsMessages";
 import { AssistantStatus, HelpEvent, TranscriptionEvent } from "@/types";
+import { pickNarratorVoice } from "@/hooks/useSpeechReader";
 
 const RECONNECT_BASE_DELAY_MS = 1000;
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -27,10 +28,22 @@ export function resolveWsUrl(explicitUrl?: string): string {
 interface UseReadingAssistantOptions {
   url?: string;
   autoConnect?: boolean;
+  preferredVoiceName?: string;
+  voiceLocale?: string;
+}
+
+export interface ReadingAssistantContext {
+  text: string;
+  studentName?: string;
+  profileId?: string;
+  readingLevel?: 2 | 3;
+  voice?: string;
+  systemPrompt?: string;
+  bookTitle?: string;
 }
 
 export function useReadingAssistant(options: UseReadingAssistantOptions = {}) {
-  const { url, autoConnect = true } = options;
+  const { url, autoConnect = true, preferredVoiceName, voiceLocale = "en-US" } = options;
 
   const [status, setStatus] = useState<AssistantStatus>("idle");
   const [lastError, setLastError] = useState<string | null>(null);
@@ -90,7 +103,7 @@ export function useReadingAssistant(options: UseReadingAssistantOptions = {}) {
           timestamp: message.timestamp,
         };
         setHelpMessages((prev) => [...prev, help]);
-        playHelpAudio(help);
+        playHelpAudio(help, preferredVoiceName, voiceLocale);
       } else if (message.type === "error") {
         setLastError(message.message);
       }
@@ -115,7 +128,7 @@ export function useReadingAssistant(options: UseReadingAssistantOptions = {}) {
     socket.onerror = () => {
       // onclose always follows onerror; nothing else to do here.
     };
-  }, [url]);
+  }, [preferredVoiceName, url, voiceLocale]);
 
   const disconnect = useCallback(() => {
     manualCloseRef.current = true;
@@ -137,10 +150,20 @@ export function useReadingAssistant(options: UseReadingAssistantOptions = {}) {
 
   /** Share the on-screen passage so the server can tell "reading aloud"
    * apart from "asking a question" and avoid interrupting the child. */
-  const sendContext = useCallback((text: string) => {
+  const sendContext = useCallback((context: string | ReadingAssistantContext) => {
     const socket = socketRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "context", text }));
+      const payload = typeof context === "string" ? { text: context } : context;
+      socket.send(JSON.stringify({
+        type: "context",
+        text: payload.text,
+        student_name: typeof context === "string" ? undefined : context.studentName,
+        profile_id: typeof context === "string" ? undefined : context.profileId,
+        reading_level: typeof context === "string" ? undefined : context.readingLevel,
+        voice: typeof context === "string" ? undefined : context.voice,
+        system_prompt: typeof context === "string" ? undefined : context.systemPrompt,
+        book_title: typeof context === "string" ? undefined : context.bookTitle,
+      }));
     }
   }, []);
 
@@ -162,7 +185,28 @@ export function useReadingAssistant(options: UseReadingAssistantOptions = {}) {
   };
 }
 
-function playHelpAudio(help: HelpEvent) {
+function playHelpAudio(help: HelpEvent, preferredVoiceName?: string, voiceLocale = "en-US") {
+  if (
+    preferredVoiceName &&
+    help.helpMessage &&
+    typeof window !== "undefined" &&
+    "speechSynthesis" in window &&
+    typeof SpeechSynthesisUtterance !== "undefined"
+  ) {
+    const voice = pickNarratorVoice(
+      window.speechSynthesis.getVoices(),
+      voiceLocale,
+      preferredVoiceName
+    );
+    if (voice && voice.name.toLowerCase().includes(preferredVoiceName.toLowerCase())) {
+      const utterance = new SpeechSynthesisUtterance(help.helpMessage);
+      utterance.voice = voice;
+      utterance.lang = voiceLocale;
+      utterance.rate = 0.92;
+      window.speechSynthesis.speak(utterance);
+      return;
+    }
+  }
   if (!help.audio) return;
   const format = help.audioFormat || "wav";
   const audio = new Audio(`data:audio/${format};base64,${help.audio}`);

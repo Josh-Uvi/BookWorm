@@ -5,9 +5,26 @@ export interface Book {
   coverUrl: string;
   description: string;
   genre: string;
+  level?: 2 | 3;
+  pages?: number;
+  publishedYear?: number;
   pdfUrl?: string;
   interests?: string[];
   chapters: Chapter[];
+}
+
+export interface StudentProfile {
+  id: "student-a" | "student-b";
+  loginName: "StudentA" | "StudentB";
+  displayName: string;
+  readingLevel: 2 | 3;
+  readingLabel: string;
+  voice: "Tiffany" | "Amy";
+  voiceLocale: "en-US" | "en-GB";
+  description: string;
+  avatarUrl?: string;
+  tools: string[];
+  systemPrompt: string;
 }
 
 export interface Chapter {

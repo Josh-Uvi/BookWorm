@@ -151,6 +151,8 @@ interface UseSpeechReaderStartOptions {
   rate?: number;
   /** BCP-47 language tag used to pick a voice. Defaults to "en-US". */
   lang?: string;
+  /** Prefer a named system voice (for example Tiffany or Amy) when installed. */
+  preferredVoiceName?: string;
 }
 
 /**
@@ -221,9 +223,17 @@ export function scoreNarratorVoice(
 /** Pick the friendliest available voice for the requested language. */
 export function pickNarratorVoice(
   voices: SpeechSynthesisVoice[],
-  lang: string = "en-US"
+  lang: string = "en-US",
+  preferredVoiceName?: string
 ): SpeechSynthesisVoice | null {
   if (!voices.length) return null;
+  const preferred = preferredVoiceName?.trim().toLowerCase();
+  if (preferred) {
+    const exact = voices.find((voice) => voice.name.toLowerCase() === preferred);
+    if (exact) return exact;
+    const partial = voices.find((voice) => voice.name.toLowerCase().includes(preferred));
+    if (partial) return partial;
+  }
   let best: SpeechSynthesisVoice | null = null;
   let bestScore = -Infinity;
   for (const voice of voices) {
@@ -287,7 +297,11 @@ export function useSpeechReader() {
       // artificially raising the pitch, which can sound thin or robotic.
       utterance.pitch = 1;
       utterance.lang = lang;
-      const voice = pickNarratorVoice(window.speechSynthesis.getVoices(), lang);
+      const voice = pickNarratorVoice(
+        window.speechSynthesis.getVoices(),
+        lang,
+        options.preferredVoiceName
+      );
       if (voice) utterance.voice = voice;
       const fallbackTimeline = buildSpeechTimeline(tokens, rate);
       let speechStartedAt: number | null = null;

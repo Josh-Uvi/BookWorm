@@ -21,6 +21,9 @@ export default defineConfig(({ mode }) => ({
         target: "http://localhost:8766",
         rewrite: (mediaPath) => mediaPath.replace(/^\/media/, ""),
       },
+      "/api": {
+        target: "http://localhost:8766",
+      },
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),

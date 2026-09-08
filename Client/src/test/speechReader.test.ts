@@ -127,6 +127,11 @@ describe("speechUnsupportedReason", () => {
 });
 
 describe("narrator voice selection", () => {
+  it("uses the requested student-profile voice when it is installed", () => {
+    const tiffany = voice("Tiffany", "en-US");
+    const natural = voice("Microsoft Aria Online (Natural) - English (United States)");
+    expect(pickNarratorVoice([natural, tiffany], "en-US", "Tiffany")).toBe(tiffany);
+  });
   it("prefers a natural voice over a robotic system voice", () => {
     const natural = voice("Microsoft Aria Online (Natural) - English (United States)");
     const robotic = voice("Zarvox");

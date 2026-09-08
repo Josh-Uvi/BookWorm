@@ -1,5 +1,6 @@
 import { Book } from "@/types";
 import { sampleBooks } from "@/data/sampleBooks";
+import { getReadingLevelBooks, readingLevelBooks } from "@/data/readingBooks";
 
 /**
  * Books are served by the platform-agnostic media server (`/media`
@@ -7,6 +8,7 @@ import { sampleBooks } from "@/data/sampleBooks";
  * If it is unreachable we gracefully fall back to the bundled samples.
  */
 const MEDIA_URL = (import.meta.env.VITE_MEDIA_URL || "/media").replace(/\/+$/, "");
+const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
 
 function resolveMediaUrl(relativePath: string): string {
   return `${MEDIA_URL}/${relativePath.replace(/^\/+/, "")}`;
@@ -14,6 +16,62 @@ function resolveMediaUrl(relativePath: string): string {
 
 interface RawBook extends Omit<Book, "pdfUrl"> {
   pdfUrl?: string;
+}
+
+interface ApiBook {
+  book_id: string;
+  name: string;
+  level: 2 | 3;
+  description: string;
+  author: string;
+  pages: number;
+  genre: string;
+  published_year: number;
+  pdf_url?: string;
+  cover_url?: string;
+  sample_text?: string;
+}
+
+interface BooksApiResponse {
+  books: ApiBook[];
+  level: 2 | 3;
+  count: number;
+  source?: "postgres" | "media" | "mock";
+}
+
+export interface LevelBooksResult {
+  books: Book[];
+  fellBack: boolean;
+  source: "postgres" | "media" | "mock" | "bundled";
+}
+
+function normalizeFallbackBook(book: Book): Book {
+  return {
+    ...book,
+    // The API and media server share a backend; if the API is unreachable,
+    // prefer the bundled practice passage over an iframe that cannot load.
+    pdfUrl: undefined,
+  };
+}
+
+function normalizeApiBook(book: ApiBook): Book {
+  const fallback = readingLevelBooks.find((candidate) => candidate.id === book.book_id);
+  const sampleText = book.sample_text?.trim();
+  return {
+    id: book.book_id,
+    title: book.name,
+    author: book.author,
+    coverUrl: book.cover_url || fallback?.coverUrl || "",
+    description: book.description,
+    genre: book.genre,
+    level: book.level,
+    pages: book.pages,
+    publishedYear: book.published_year,
+    pdfUrl: book.pdf_url ? resolveMediaUrl(book.pdf_url) : undefined,
+    chapters: sampleText
+      ? [{ id: `${book.book_id}-sample`, title: "Reading Practice", content: sampleText }]
+      : (fallback?.chapters ?? []),
+  };
 }
 
 async function fetchMediaBooks(): Promise<Book[]> {
@@ -28,6 +86,17 @@ async function fetchMediaBooks(): Promise<Book[]> {
   }));
 }
 
+async function fetchMediaBooksByLevel(level: 2 | 3): Promise<Book[]> {
+  const books = (await fetchMediaBooks()).filter((book) => book.level === level);
+  const availableBooks = await Promise.all(
+    books.map(async (book) => {
+      if (book.pdfUrl && !(await isPdfAvailable(book.pdfUrl))) return null;
+      return book;
+    })
+  );
+  return availableBooks.filter((book): book is Book => book !== null);
+}
+
 export const fetchBooks = async (): Promise<Book[]> => {
   try {
     const books = await fetchMediaBooks();
@@ -36,6 +105,57 @@ export const fetchBooks = async (): Promise<Book[]> => {
     return sampleBooks; // media server offline — use the bundled samples
   }
 };
+
+export async function fetchBooksByLevel(level: 2 | 3): Promise<LevelBooksResult> {
+  let apiMockBooks: Book[] = [];
+  try {
+    const response = await fetch(`${API_URL}/books?level=${level}`);
+    if (!response.ok) {
+      throw new Error(`books API request failed (${response.status})`);
+    }
+    const payload = (await response.json()) as BooksApiResponse;
+    if (!Array.isArray(payload.books) || payload.level !== level || payload.books.length === 0) {
+      throw new Error("books API returned an invalid or empty catalogue");
+    }
+    const books = await Promise.all(
+      payload.books.map(async (rawBook) => {
+        const book = normalizeApiBook(rawBook);
+        if (book.pdfUrl && !(await isPdfAvailable(book.pdfUrl))) {
+          return { ...book, pdfUrl: undefined };
+        }
+        return book;
+      })
+    );
+    if (payload.source !== "mock") {
+      return {
+        books,
+        fellBack: false,
+        source: payload.source ?? "postgres",
+      };
+    }
+    apiMockBooks = books;
+  } catch {
+    // The level API may be offline while the media catalogue is still
+    // available, especially during native development. Try it next.
+  }
+
+  try {
+    const mediaBooks = await fetchMediaBooksByLevel(level);
+    if (mediaBooks.length > 0) {
+      return { books: mediaBooks, fellBack: false, source: "media" };
+    }
+  } catch {
+    // Both server-backed sources are unavailable; use development data below.
+  }
+
+  return {
+    books: apiMockBooks.length > 0
+      ? apiMockBooks
+      : getReadingLevelBooks(level).map(normalizeFallbackBook),
+    fellBack: apiMockBooks.length === 0,
+    source: apiMockBooks.length > 0 ? "mock" : "bundled",
+  };
+}
 
 export const fetchBook = async (bookId: string): Promise<Book | null> => {
   const books = await fetchBooks();

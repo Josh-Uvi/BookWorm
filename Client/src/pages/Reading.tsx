@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Headphones,
   Loader2,
+  LogOut,
   MessageSquare,
   Mic,
   MicOff,
@@ -42,6 +43,7 @@ import {
   ReadingProgress,
   TranscriptionEvent,
   UserPreferences,
+  StudentProfile,
 } from "@/types";
 
 const defaultPreferences: UserPreferences = {
@@ -54,7 +56,7 @@ const defaultPreferences: UserPreferences = {
 const STATUS_LABEL: Record<AssistantStatus, string> = {
   idle: "Offline",
   connecting: "Connecting…",
-  connected: "Listening",
+  connected: "Active",
   reconnecting: "Reconnecting…",
   error: "Connection error",
 };
@@ -79,6 +81,9 @@ interface AssistantSidebarProps {
   onToggleMic: () => void;
   onClear: () => void;
   onClose: () => void;
+  student?: StudentProfile;
+  book?: Book | null;
+  onSwitchStudent?: () => void;
 }
 
 const AssistantSidebar = ({
@@ -93,6 +98,9 @@ const AssistantSidebar = ({
   onToggleMic,
   onClear,
   onClose,
+  student,
+  book,
+  onSwitchStudent,
 }: AssistantSidebarProps) => {
   const feedEndRef = useRef<HTMLDivElement>(null);
 
@@ -113,13 +121,28 @@ const AssistantSidebar = ({
             }`}
           />
           <span className="text-xs text-muted-foreground">
-            {isRecording ? "Recording" : STATUS_LABEL[status]}
+            {isRecording ? "Listening" : STATUS_LABEL[status]}
           </span>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close assistant">
           <X className="h-4 w-4" />
         </Button>
       </div>
+
+      {student && (
+        <div className="border-b border-border bg-primary/5 p-4">
+          <p className="font-semibold text-foreground">Hi, {student.displayName}! 👋</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            You’re reading <span className="font-semibold text-foreground">{book?.title}</span> with
+            {` ${student.voice}`} voice support.
+          </p>
+          {onSwitchStudent && (
+            <Button variant="outline" size="sm" onClick={onSwitchStudent} className="mt-3 w-full rounded-full">
+              <LogOut className="mr-2 h-4 w-4" /> Switch Student
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Mic control */}
       <div className="border-b border-border p-4">
@@ -133,7 +156,7 @@ const AssistantSidebar = ({
           ) : (
             <Mic className="mr-2 h-4 w-4" />
           )}
-          {isRecording ? "Stop reading aloud" : "Read aloud — I'm listening"}
+          {isRecording ? "Stop Reading Session" : "Start Reading Session"}
         </Button>
         <p className="mt-2 text-xs text-muted-foreground">
           {isSupported
@@ -174,7 +197,7 @@ const AssistantSidebar = ({
           ))}
           {transcript.length === 0 && helpMessages.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              Press “Read aloud” and start reading — your words and the assistant’s encouragement
+              Press “Start Reading Session” and begin reading — your words and the assistant’s encouragement
               will appear here.
             </p>
           )}
@@ -193,11 +216,17 @@ const AssistantSidebar = ({
   );
 };
 
-const Reading = () => {
+interface ReadingProps {
+  student?: StudentProfile;
+  selectedBook?: Book;
+  onSwitchStudent?: () => void;
+}
+
+const Reading = ({ student, selectedBook, onSwitchStudent }: ReadingProps) => {
   const [searchParams] = useSearchParams();
-  const bookId = searchParams.get("book") || "1";
-  const [book, setBook] = useState<Book | null>(null);
-  const [loading, setLoading] = useState(true);
+  const bookId = selectedBook?.id ?? searchParams.get("book") ?? "1";
+  const [book, setBook] = useState<Book | null>(selectedBook ?? null);
+  const [loading, setLoading] = useState(!selectedBook);
   const { toast } = useToast();
 
   const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
@@ -207,7 +236,10 @@ const Reading = () => {
   const [, setReadingHistory] = useLocalStorage<ReadingProgress[]>("reading-history", []);
   const [localFontSize, setLocalFontSize] = useState(preferences.fontSize);
 
-  const assistant = useReadingAssistant();
+  const assistant = useReadingAssistant({
+    preferredVoiceName: student?.voice,
+    voiceLocale: student?.voiceLocale,
+  });
   const recorder = useAudioRecorder({ onChunk: assistant.sendAudio });
   const speech = useSpeechReader();
   const isAssistantConnected = isAssistantReady(assistant.status);
@@ -216,6 +248,12 @@ const Reading = () => {
 
   useEffect(() => {
     const loadBook = async () => {
+      if (selectedBook) {
+        setBook(selectedBook);
+        setCurrentChapterIndex(0);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       const { book: resolvedBook, fellBack } = await fetchReadableBook(bookId);
       setBook(resolvedBook);
@@ -231,7 +269,7 @@ const Reading = () => {
     };
     loadBook();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookId]);
+  }, [bookId, selectedBook]);
 
   const chapters = book?.chapters ?? [];
   const chapterIndex = Math.min(currentChapterIndex, Math.max(chapters.length - 1, 0));
@@ -286,7 +324,10 @@ const Reading = () => {
     if (!currentChapter) return;
     // Pause the mic so the assistant doesn't transcribe the narrator's voice.
     if (recorder.isRecording) recorder.stop();
-    speech.start(currentChapter.content, chapterTokens);
+    speech.start(currentChapter.content, chapterTokens, {
+      lang: student?.voiceLocale,
+      preferredVoiceName: student?.voice,
+    });
   };
 
   // A connection loss makes microphone listening unavailable, but read-along
@@ -307,11 +348,19 @@ const Reading = () => {
   // child actually talks to it. Sent when the mic turns on and whenever the
   // chapter changes while recording.
   useEffect(() => {
-    if (recorder.isRecording && currentChapter) {
-      assistant.sendContext(currentChapter.content);
+    if (recorder.isRecording && book) {
+      assistant.sendContext({
+        text: currentChapter?.content ?? "",
+        studentName: student?.displayName,
+        profileId: student?.id,
+        readingLevel: student?.readingLevel,
+        voice: student?.voice,
+        systemPrompt: student?.systemPrompt,
+        bookTitle: book.title,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recorder.isRecording, currentChapter?.id]);
+  }, [recorder.isRecording, currentChapter?.id, book?.id, student?.id]);
 
   const assistantSidebar = (
     <AnimatePresence>
@@ -339,6 +388,9 @@ const Reading = () => {
             onToggleMic={toggleMic}
             onClear={assistant.clearTranscript}
             onClose={() => setIsAssistantOpen(false)}
+            student={student}
+            book={book}
+            onSwitchStudent={onSwitchStudent}
           />
         </motion.div>
       )}
@@ -401,11 +453,11 @@ const Reading = () => {
             <Button
               onClick={toggleMic}
               disabled={!recorder.isSupported || !isAssistantConnected}
-              aria-label={recorder.isRecording ? "Stop reading aloud" : "Start reading aloud"}
+              aria-label={recorder.isRecording ? "Stop Reading Session" : "Start Reading Session"}
               title={
                 !isAssistantConnected
                   ? "Microphone is unavailable until the assistant reconnects"
-                  : (recorder.unsupportedReason ?? "Start reading aloud")
+                  : (recorder.unsupportedReason ?? "Start Reading Session")
               }
               className={`h-12 w-12 rounded-full shadow-lg ${
                 recorder.isRecording ? "bg-red-500 hover:bg-red-600" : "bg-primary hover-glow"
