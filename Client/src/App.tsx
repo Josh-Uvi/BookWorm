@@ -2,16 +2,77 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { ThemeProvider } from "./hooks/useTheme";
+import { ReadingFlowProvider, useReadingFlow } from "./contexts/ReadingFlowContext";
 import { Navbar } from "./components/Navbar";
 import Landing from "./pages/Landing";
 import Interests from "./pages/Interests";
 import Reading from "./pages/Reading";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
+import StudentLogin from "./components/StudentLogin";
+import BookSelection from "./components/BookSelection";
 
 const queryClient = new QueryClient();
+
+function ReadingFlow() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { currentStudent, selectedBook, login, selectBook, switchStudent } = useReadingFlow();
+
+  useEffect(() => {
+    if (location.pathname !== "/reading" || !selectedBook) return;
+    const expectedSearch = `?book=${encodeURIComponent(selectedBook.id)}`;
+    if (location.search !== expectedSearch) {
+      navigate({ pathname: "/reading", search: expectedSearch }, { replace: true });
+    }
+  }, [location.pathname, location.search, navigate, selectedBook]);
+
+  if (!currentStudent) {
+    if (location.pathname === "/reading") {
+      return <Navigate to="/" replace />;
+    }
+    return (
+      <StudentLogin
+        onLogin={(student) => {
+          login(student);
+          // Keep the current route until a book is chosen. This means entering
+          // through either `/` or `/reading` uses the exact same flow state.
+        }}
+      />
+    );
+  }
+  if (!selectedBook) {
+    return (
+      <BookSelection
+        student={currentStudent}
+        onSelect={(book) => {
+          selectBook(book);
+          navigate(`/reading?book=${encodeURIComponent(book.id)}`);
+        }}
+      />
+    );
+  }
+  return (
+    <Reading
+      student={currentStudent}
+      selectedBook={selectedBook}
+      onSwitchStudent={() => {
+        switchStudent();
+        navigate("/");
+      }}
+    />
+  );
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -20,14 +81,17 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Navbar />
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/interests" element={<Interests />} />
-            <Route path="/reading" element={<Reading />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <ReadingFlowProvider>
+            <Navbar />
+            <Routes>
+              <Route path="/" element={<ReadingFlow />} />
+              <Route path="/welcome" element={<Landing />} />
+              <Route path="/interests" element={<Interests />} />
+              <Route path="/reading" element={<ReadingFlow />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </ReadingFlowProvider>
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>

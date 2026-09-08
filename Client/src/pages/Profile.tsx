@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { 
   User, 
   Edit2, 
@@ -24,7 +24,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useTheme } from "@/hooks/useTheme";
-import { UserProfile, UserPreferences, ReadingProgress } from "@/types";
+import { UserPreferences, ReadingProgress } from "@/types";
+import { useReadingFlow } from "@/contexts/ReadingFlowContext";
 import { sampleBooks } from "@/data/sampleBooks";
 
 const interests = [
@@ -42,13 +43,6 @@ const interests = [
   { id: "nature", emoji: "🌳", label: "Nature", color: "from-lime-400 to-green-500" },
 ];
 
-const defaultProfile: UserProfile = {
-  id: "user-1",
-  name: "Reader",
-  avatarUrl: "",
-  bio: "Passionate reader exploring new worlds through books.",
-};
-
 const defaultPreferences: UserPreferences = {
   fontSize: 16,
   lineSpacing: 1.6,
@@ -59,13 +53,28 @@ const defaultPreferences: UserPreferences = {
 const Profile = () => {
   const navigate = useNavigate();
   const { setTheme } = useTheme();
-  const [profile, setProfile] = useLocalStorage<UserProfile>("user-profile", defaultProfile);
+  const { currentStudent, selectedBook, updateStudent } = useReadingFlow();
   const [preferences, setPreferences] = useLocalStorage<UserPreferences>("user-preferences", defaultPreferences);
   const [readingHistory] = useLocalStorage<ReadingProgress[]>("reading-history", []);
   const [selectedInterests, setSelectedInterests] = useLocalStorage<string[]>("user-interests", []);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedName, setEditedName] = useState(profile.name);
-  const [editedBio, setEditedBio] = useState(profile.bio);
+  const [editedName, setEditedName] = useState(currentStudent?.displayName ?? "");
+  const [editedBio, setEditedBio] = useState(currentStudent?.description ?? "");
+
+  useEffect(() => {
+    setEditedName(currentStudent?.displayName ?? "");
+    setEditedBio(currentStudent?.description ?? "");
+  }, [currentStudent?.description, currentStudent?.displayName]);
+
+  if (!currentStudent) {
+    return <Navigate to="/" replace />;
+  }
+
+  const profile = {
+    name: currentStudent.displayName,
+    bio: currentStudent.description,
+    avatarUrl: currentStudent.avatarUrl ?? "",
+  };
 
   const toggleInterest = (id: string) => {
     setSelectedInterests(prev => 
@@ -74,15 +83,16 @@ const Profile = () => {
   };
 
   const handleSaveProfile = () => {
-    setProfile({
-      ...profile,
-      name: editedName,
-      bio: editedBio,
+    updateStudent({
+      displayName: editedName.trim() || currentStudent.loginName,
+      description: editedBio.trim() || currentStudent.description,
+      avatarUrl: currentStudent.avatarUrl,
     });
     setIsEditing(false);
   };
 
   const getBookById = (bookId: string) => {
+    if (selectedBook?.id === bookId) return selectedBook;
     return sampleBooks.find((book) => book.id === bookId);
   };
 
@@ -138,6 +148,17 @@ const Profile = () => {
                       {profile.name}
                     </h1>
                     <p className="text-muted-foreground mb-4">{profile.bio}</p>
+                    <div className="mb-4 flex flex-wrap justify-center gap-2 text-xs font-semibold sm:justify-start">
+                      <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">
+                        {currentStudent.loginName}
+                      </span>
+                      <span className="rounded-full bg-surface px-3 py-1 text-muted-foreground">
+                        Level {currentStudent.readingLevel} · {currentStudent.readingLabel}
+                      </span>
+                      <span className="rounded-full bg-surface px-3 py-1 text-muted-foreground">
+                        {currentStudent.voice} voice
+                      </span>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
@@ -422,13 +443,8 @@ const Profile = () => {
                   <div>
                     <Label className="text-foreground mb-4 block">Reading Level</Label>
                     <Select
-                      value={preferences.readingLevel}
-                      onValueChange={(value) =>
-                        setPreferences((prev) => ({
-                          ...prev,
-                          readingLevel: value as UserPreferences["readingLevel"],
-                        }))
-                      }
+                      value={currentStudent.readingLevel === 2 ? "beginner" : "intermediate"}
+                      disabled
                     >
                       <SelectTrigger className="bg-surface border-border">
                         <SelectValue placeholder="Select reading level" />
@@ -436,10 +452,12 @@ const Profile = () => {
                       <SelectContent>
                         <SelectItem value="beginner">📖 Beginner (Ages 5-7)</SelectItem>
                         <SelectItem value="intermediate">📚 Intermediate (Ages 8-9)</SelectItem>
-                        <SelectItem value="advanced">📕 Advanced (Ages 10-11)</SelectItem>
-                        <SelectItem value="expert">🎓 Expert (Ages 12+)</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Reading level comes from the active student session. Use Switch Student in
+                      the reading session to choose another profile.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -458,7 +476,7 @@ const Profile = () => {
                     <Label className="text-foreground">Display Name</Label>
                     <Input
                       value={profile.name}
-                      onChange={(e) => setProfile((prev) => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => updateStudent({ displayName: e.target.value })}
                       className="mt-2 bg-surface border-border"
                     />
                   </div>
@@ -467,7 +485,7 @@ const Profile = () => {
                     <Label className="text-foreground">Bio</Label>
                     <Input
                       value={profile.bio}
-                      onChange={(e) => setProfile((prev) => ({ ...prev, bio: e.target.value }))}
+                      onChange={(e) => updateStudent({ description: e.target.value })}
                       className="mt-2 bg-surface border-border"
                     />
                   </div>
@@ -476,7 +494,7 @@ const Profile = () => {
                     <Label className="text-foreground">Avatar URL</Label>
                     <Input
                       value={profile.avatarUrl}
-                      onChange={(e) => setProfile((prev) => ({ ...prev, avatarUrl: e.target.value }))}
+                      onChange={(e) => updateStudent({ avatarUrl: e.target.value })}
                       placeholder="https://example.com/avatar.jpg"
                       className="mt-2 bg-surface border-border"
                     />
