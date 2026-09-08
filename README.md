@@ -1,11 +1,11 @@
 # AI Reading Assistant
 
-A platform-agnostic reading companion for children. The child opens a book, reads it aloud,
-and the assistant **listens in real time** — transcribing their speech, noticing when they
-struggle, and speaking a friendly, encouraging help message back.
+AI reading companion for children. This platform-agnostic reading app lets users open a book and read it aloud, while the assistant **listens in real time** — transcribing their speech, detecting when they struggle, and responding with a friendly, encouraging help message or answering context-related questions.
+
+### App Flow
 
 The assistant has **guardrails against interrupting**: it always knows the passage the child
-is reading (shared by the client), so it can tell *reading aloud* apart from *talking to the
+is reading (shared by the client), so it can distinguish *reading aloud* from *talking to the
 assistant*. While the child reads the book — even slowly or stumbling — it stays quiet; and
 when the child **asks a question about the story** ("what is a trunk?"), it answers directly
 and simply, grounded in the passage. It answers honestly: "I'm not sure" when it can't know,
@@ -65,18 +65,17 @@ transcript appears in the sidebar and the assistant speaks an encouraging reply.
 
 ### Student reading flow
 
-The app now guides children through **Landing (/) → Student Login (/login) → Level-based Book
+The app now guides users through **Landing (/) → Student Login (/login) → Level-based Book
 Selection (/books) → Reading Session (/reading) → Profile (/profile)**, with **Logout** on the
 Profile page returning to the landing page. StudentA receives Level 2 beginning-reader support
 with the Tiffany voice, while StudentB receives Level 3 comprehension support with the Amy
-voice. Book metadata comes from `GET /api/books?level=2|3`, backed by PostgreSQL in Docker and
-built-in mock data when the database or API is unavailable.
+voice. Book metadata is retrieved via `GET /api/books?level=2|3`, backed by a PostgreSQL database in Docker and using built-in mock data when the database or API is unavailable.
 
 The books, reading, interests, and profile routes are session-protected; books and reading are intentionally omitted from the navbar.
-During an active student session, the navbar shows that student's profile and disables the
+During an active student session, the navbar displays that student's profile and disables the
 Bookworm home link; use **Logout** on the Profile page to clear the session.
 
-Every reading session records progress into the shared flow context, and the Profile page's
+Every reading session records progress in the shared flow context, and the Profile page's
 **History** tab renders it with self-contained book snapshots (title, author, chapter, level)
 — no static fixture lookups. **Clear History** wipes it; switching or logging out a student
 clears it automatically.
