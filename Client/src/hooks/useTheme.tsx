@@ -54,6 +54,7 @@ export function ThemeProvider({ children, defaultTheme = "system" }: ThemeProvid
   return <ThemeProviderContext.Provider value={value}>{children}</ThemeProviderContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook + provider belong together
 export const useTheme = () => {
   const context = useContext(ThemeProviderContext);
   if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider");
