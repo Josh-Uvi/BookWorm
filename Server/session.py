@@ -34,6 +34,15 @@ class ReadingSession:
         self._accumulated: list[str] = []
         self._last_analysis_time: float | None = None
 
+        # ── Guardrail state ──────────────────────────────────────────────
+        # The book passage the child is reading (shared by the client), used
+        # to tell "reading aloud" apart from "talking to the assistant".
+        self.expected_text: str | None = None
+        self._last_help_at: float | None = None
+        # Silenced by the child ("stop", "shh"…): no interruptions until the
+        # next direct question re-engages the assistant.
+        self._muted = False
+
     # ── Audio ────────────────────────────────────────────────────────
 
     def add_audio(self, data: bytes) -> None:
@@ -93,3 +102,26 @@ class ReadingSession:
     def mark_analyzed(self) -> None:
         self._last_analysis_time = time.monotonic()
         self._accumulated.clear()
+
+    # ── Guardrails ────────────────────────────────────────────────────
+
+    def set_expected_text(self, text: str) -> None:
+        """Remember the passage the child is reading (blank clears it)."""
+        self.expected_text = text or None
+
+    @property
+    def last_help_at(self) -> float | None:
+        """Monotonic timestamp of the last delivered help message, if any."""
+        return self._last_help_at
+
+    def mark_help_delivered(self) -> None:
+        self._last_help_at = time.monotonic()
+
+    @property
+    def muted(self) -> bool:
+        """Silenced by the child ("stop") — no interruptions until the
+        next direct question re-engages the assistant."""
+        return self._muted
+
+    def set_muted(self, muted: bool) -> None:
+        self._muted = bool(muted)

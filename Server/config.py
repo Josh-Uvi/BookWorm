@@ -57,6 +57,11 @@ class Settings:
     stt_flush_interval: float = 4.0            # how often buffered audio is transcribed
     max_buffer_bytes: int = 20_971_520        # 20 MB audio per session epoch
 
+    # ── Guardrails (when the assistant may interrupt the child) ──────────
+    reading_match_threshold: float = 0.5   # passage-overlap score above which the child is "reading aloud"
+    help_cooldown_seconds: float = 30.0     # minimum silence between help messages (non-question intents)
+    help_min_confidence: float = 0.7        # LLM verdict confidence required to speak up
+
     # ── Speech-to-text (STT_PROVIDER) ───────────────────────────────
     stt_provider: str = "faster_whisper"
     whisper_model: str = "base"          # tiny / base / small / medium / large-v3
@@ -67,7 +72,7 @@ class Settings:
     llm_provider: str = "ollama"
     llm_base_url: str = "http://localhost:11434/v1"
     llm_api_key: str = "ollama"          # required by the SDK; unused by local servers
-    llm_model: str = "llama3.2:1b"      # lightweight 1B model (~1.3 GB; served by the ollama container)
+    llm_model: str = "qwen2.5:3b"       # recommended: grounded answers + clean JSON (~2 GB; needs ~4 GB RAM)
     llm_temperature: float = 0.3
     llm_max_tokens: int = 500
     llm_timeout: float = 30.0
@@ -88,7 +93,7 @@ class Settings:
     minio_secure: bool = False
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         return cls(
             host=_str("HOST", cls.host),
             port=_int("PORT", cls.port),
@@ -98,6 +103,9 @@ class Settings:
             accumulation_window_seconds=_float("ACCUMULATION_WINDOW_SECONDS", cls.accumulation_window_seconds),
             stt_flush_interval=_float("STT_FLUSH_INTERVAL", cls.stt_flush_interval),
             max_buffer_bytes=_int("MAX_BUFFER_BYTES", cls.max_buffer_bytes),
+            reading_match_threshold=_float("READING_MATCH_THRESHOLD", cls.reading_match_threshold),
+            help_cooldown_seconds=_float("HELP_COOLDOWN_SECONDS", cls.help_cooldown_seconds),
+            help_min_confidence=_float("HELP_MIN_CONFIDENCE", cls.help_min_confidence),
             stt_provider=_str("STT_PROVIDER", cls.stt_provider),
             whisper_model=_str("WHISPER_MODEL", cls.whisper_model),
             whisper_device=_str("WHISPER_DEVICE", cls.whisper_device),

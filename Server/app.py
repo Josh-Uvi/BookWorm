@@ -15,15 +15,26 @@ import binascii
 import contextlib
 import json
 import logging
+import time
 from datetime import datetime, timezone
 
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
 from config import Settings
+from guardrails import (
+    NOT_SURE_ANSWER,
+    OUT_OF_CONTEXT_ANSWER,
+    classify_intent,
+    decide_interrupt,
+    is_gratitude_command,
+    is_meta_answer,
+    is_mute_command,
+    question_relates_to_passage,
+)
 from media_server import MediaServer
-from prompts import READING_ASSISTANT_PROMPT
-from providers import build_llm, build_stt, build_tts, build_storage
+from prompts import QUESTION_ANSWER_PROMPT, READING_ASSISTANT_PROMPT
+from providers import build_llm, build_storage, build_stt, build_tts
 from session import ReadingSession
 
 logger = logging.getLogger("reading-assistant")
@@ -98,6 +109,15 @@ class ReadingAssistantServer:
             data = payload.get("data")
             if isinstance(data, str) and data:
                 await self._ingest_audio(data, session, connection)
+        elif kind == "context":
+            # The on-screen chapter text — lets the server tell "reading
+            # aloud" apart from "asking a question" (see guardrails.py).
+            text = payload.get("text")
+            if isinstance(text, str):
+                session.set_expected_text(text)
+                logger.info(
+                    "Context (%s): reading passage updated (%d chars)", client_id, len(text)
+                )
         elif kind == "control":
             action = payload.get("action")
             if action == "stop":
@@ -126,14 +146,14 @@ class ReadingAssistantServer:
     # ── Periodic STT + analysis ──────────────────────────────────────
 
     async def _flush_loop(self, connection, session, client_id) -> None:
+        # CancelledError (from flush_task.cancel() on disconnect) propagates
+        # out of the loop; handle_connection already suppresses it while
+        # awaiting the task, so no handler is needed here.
         interval = self.settings.stt_flush_interval
-        try:
-            while True:
-                await asyncio.sleep(interval)
-                if session.has_pending_audio:
-                    await self._flush_once(connection, session, client_id)
-        except asyncio.CancelledError:
-            raise
+        while True:
+            await asyncio.sleep(interval)
+            if session.has_pending_audio:
+                await self._flush_once(connection, session, client_id)
 
     async def _flush_once(self, connection, session, client_id) -> None:
         segments, confidence = await asyncio.to_thread(session.flush, self.stt)
@@ -157,37 +177,234 @@ class ReadingAssistantServer:
         accumulated = session.get_accumulated_text()
         if not accumulated.strip():
             return
-        prompt = READING_ASSISTANT_PROMPT.format(text=accumulated)
+
+        # Voice-command guardrail — the child asked for silence ("stop",
+        # "shh", "be quiet"…). Mute the assistant until the next direct
+        # question. The ack is displayed in the sidebar but never spoken
+        # (replying out loud would be the interruption they just refused).
+        if is_mute_command(accumulated):
+            session.mark_analyzed()
+            session.set_muted(True)
+            logger.info(
+                "Guardrail (%s): mute command — going quiet until the next question",
+                client_id,
+            )
+            await self._deliver_help(
+                connection,
+                session,
+                client_id,
+                message="Okay, I'll stay quiet while you read. Ask me anything whenever you like!",
+                intent="mute_command",
+                reason="asked to be quiet",
+                speak=False,
+            )
+            return
+
+        # Gratitude guardrail — "thank you" after an answer means "got it,
+        # I'm going back to reading". Same muted state as "stop", but with a
+        # warmer (still unspoken) ack — the child will keep reading until
+        # their next direct question, which is answered and lifts the mute.
+        if is_gratitude_command(accumulated):
+            session.mark_analyzed()
+            session.set_muted(True)
+            logger.info(
+                "Guardrail (%s): thanks after answer — going quiet until the next question",
+                client_id,
+            )
+            await self._deliver_help(
+                connection,
+                session,
+                client_id,
+                message="You're welcome! I'll be quiet while you read — ask me anything whenever you like.",
+                intent="thanks_command",
+                reason="thanked for the answer",
+                speak=False,
+            )
+            return
+
+        # Muted mode — stay silent for everything except direct questions.
+        # A question means the child is engaging again: answer it and unmute.
+        # (No LLM call while muted — quiet means quiet.)
+        if session.muted:
+            intent = classify_intent(
+                accumulated,
+                session.expected_text,
+                match_threshold=self.settings.reading_match_threshold,
+            )
+            if intent.intent != "question":
+                session.mark_analyzed()
+                logger.info(
+                    "Guardrail (%s): muted — staying quiet (%r)",
+                    client_id,
+                    accumulated[:60],
+                )
+                return
+            session.set_muted(False)
+            logger.info("Guardrail (%s): question while muted — unmuting", client_id)
+            await self._answer_question(connection, session, client_id, accumulated, intent)
+            return
+
+        # Guardrail 1 — deterministic intent: if the transcript matches the
+        # passage the child is reading, the child is reading aloud, so stay
+        # quiet. Don't even call the LLM (small models hallucinate "needs
+        # help" for ordinary book text and would interrupt constantly).
+        intent = classify_intent(
+            accumulated,
+            session.expected_text,
+            match_threshold=self.settings.reading_match_threshold,
+        )
+        if intent.intent == "reading":
+            session.mark_analyzed()
+            logger.info(
+                "Guardrail (%s): reading aloud (passage match %.0f%%) — staying quiet",
+                client_id,
+                intent.match_score * 100,
+            )
+            return
+
+        if intent.intent == "question":
+            # The child stopped reading and is talking to the assistant —
+            # answer the question (with honest fallbacks), never stay silent.
+            await self._answer_question(connection, session, client_id, accumulated, intent)
+            return
+
+        prompt = READING_ASSISTANT_PROMPT.format(
+            text=accumulated,
+            passage=session.expected_text or "(not available — no passage shared)",
+        )
         try:
             verdict = await self.llm.analyze(prompt)
         except Exception:
             logger.exception("LLM analysis failed for %s", client_id)
             return
         session.mark_analyzed()
-        if not verdict.get("needs_help"):
+
+        # Guardrail 2 — gate the LLM verdict by confidence, and — for
+        # anything that isn't an explicit question — by a cooldown so the
+        # assistant cannot keep nagging while the child reads.
+        decision = decide_interrupt(
+            intent,
+            verdict,
+            now=time.monotonic(),
+            last_help_at=session.last_help_at,
+            cooldown_seconds=self.settings.help_cooldown_seconds,
+            min_confidence=self.settings.help_min_confidence,
+        )
+        if not decision.send_help:
+            logger.info("Guardrail (%s): help suppressed — %s", client_id, decision.reason)
             return
 
-        help_message = str(verdict.get("help_message") or "")
+        await self._deliver_help(
+            connection,
+            session,
+            client_id,
+            message=str(verdict.get("help_message") or ""),
+            intent=decision.intent,
+            confidence=verdict.get("confidence", 0),
+            reason=str(verdict.get("reason") or ""),
+        )
+
+    async def _answer_question(
+        self, connection, session, client_id, question: str, intent
+    ) -> None:
+        """Answer a question the child asked about what they are reading.
+
+        Guarantees, in order:
+        - out-of-context questions get a deterministic "outside our story"
+          reply (no LLM call — small models happily hallucinate answers);
+        - related questions are answered by the LLM, grounded in the passage;
+        - if the LLM fails or has nothing to say, the child still gets an
+          honest "I'm not sure" — silence is never an option for a question.
+        """
+        session.mark_analyzed()
+
+        if not question_relates_to_passage(question, session.expected_text):
+            logger.info("Guardrail (%s): question out of reading context — %r", client_id, question)
+            await self._deliver_help(
+                connection,
+                session,
+                client_id,
+                message=OUT_OF_CONTEXT_ANSWER,
+                intent=intent.intent,
+                reason="outside the reading context",
+            )
+            return
+
+        prompt = QUESTION_ANSWER_PROMPT.format(
+            question=question,
+            passage=session.expected_text or "(not available — no passage shared)",
+        )
+        try:
+            verdict = await self.llm.analyze(prompt)
+        except Exception:
+            logger.exception("LLM question answering failed for %s", client_id)
+            await self._deliver_help(
+                connection,
+                session,
+                client_id,
+                message=NOT_SURE_ANSWER,
+                intent=intent.intent,
+                reason="LLM failed to answer",
+            )
+            return
+
+        # Tiny local models sometimes rename the JSON key ("answer" instead of
+        # "help_message") even when the example says otherwise — accept both
+        # so a real answer is never thrown away.
+        answer = str(
+            verdict.get("help_message") or verdict.get("answer") or ""
+        ).strip()
+        if not answer or is_meta_answer(answer):
+            # No usable answer (or the model described the question instead
+            # of answering it) — be honest with the child.
+            answer = NOT_SURE_ANSWER
+        await self._deliver_help(
+            connection,
+            session,
+            client_id,
+            message=answer,
+            intent=intent.intent,
+            confidence=verdict.get("confidence", 0),
+            reason=str(verdict.get("reason") or ""),
+        )
+
+    async def _deliver_help(
+        self,
+        connection,
+        session,
+        client_id,
+        *,
+        message: str,
+        intent: str,
+        confidence=None,
+        reason: str = "",
+        speak: bool = True,
+    ) -> None:
+        """Send the message to the client, synthesized to speech unless
+        ``speak=False`` (used for the mute ack, which must stay silent)."""
+        session.mark_help_delivered()
+
         audio_base64 = None
         audio_format = None
-        if help_message:
+        if message and speak:
             try:
-                audio, audio_format = await self.tts.synthesize(help_message)
+                audio, audio_format = await self.tts.synthesize(message)
                 audio_base64 = base64.b64encode(audio).decode("ascii")
             except Exception:
                 logger.exception("TTS synthesis failed for %s", client_id)
 
-        logger.info("Help needed (%s): %s", client_id, help_message)
+        logger.info("Help needed (%s, intent=%s): %s", client_id, intent, message)
         await self._send(
             connection,
             {
                 "type": "help_needed",
                 "needs_help": True,
-                "help_message": help_message,
+                "intent": intent,
+                "help_message": message,
                 "audio": audio_base64,
                 "audio_format": audio_format,
-                "confidence": verdict.get("confidence", 0),
-                "reason": verdict.get("reason", ""),
+                "confidence": confidence,
+                "reason": reason,
                 "timestamp": _now(),
             },
         )

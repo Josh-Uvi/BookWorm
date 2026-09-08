@@ -3,6 +3,7 @@
 import time
 
 from conftest import FakeSTT
+
 from session import ReadingSession
 
 
@@ -63,3 +64,38 @@ def test_should_analyze_window():
     time.sleep(0.05)
     quick.add_text("help me")
     assert quick.should_analyze() is True  # window elapsed
+
+
+def test_guardrail_state_expected_text():
+    session = ReadingSession()
+    assert session.expected_text is None
+
+    session.set_expected_text("chapter one text")
+    assert session.expected_text == "chapter one text"
+
+    session.set_expected_text("")  # blank clears the passage
+    assert session.expected_text is None
+
+
+def test_guardrail_state_help_cooldown():
+    session = ReadingSession()
+    assert session.last_help_at is None
+
+    session.mark_help_delivered()
+    first = session.last_help_at
+    assert first is not None
+
+    time.sleep(0.01)
+    session.mark_help_delivered()
+    assert session.last_help_at >= first  # timestamp advances
+
+
+def test_guardrail_state_muted():
+    session = ReadingSession()
+    assert session.muted is False
+
+    session.set_muted(True)  # the child said "stop"
+    assert session.muted is True
+
+    session.set_muted(False)  # a direct question re-engaged the assistant
+    assert session.muted is False
