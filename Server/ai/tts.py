@@ -36,7 +36,14 @@ class PiperTTS:
     def __init__(self, voice: str = "en_US-amy-medium", models_dir: str = "models"):
         from piper import PiperVoice  # lazy import
 
+        # Relative model dirs are resolved against the Server root (this
+        # file lives at Server/ai/tts.py), not the CWD — `make dev-server`
+        # runs from the repo root, where ./models does not exist. Absolute
+        # paths (Docker's /app/models) are untouched.
+        server_root = Path(__file__).resolve().parent.parent
         model_path = Path(models_dir) / f"{voice}.onnx"
+        if not model_path.is_absolute():
+            model_path = server_root / model_path
         if not model_path.exists():
             raise FileNotFoundError(
                 f"Piper voice not found: {model_path}\n"
@@ -59,5 +66,7 @@ class PiperTTS:
             if hasattr(self._voice, "synthesize_wav"):
                 self._voice.synthesize_wav(text, wav_file)
             else:  # piper-tts < 1.3
-                self._voice.synthesize(text, wav_file)
+                # Old piper took the wav file as argument 2; the modern stubs
+                # describe only the >= 1.3 signature, so silence the checker.
+                self._voice.synthesize(text, wav_file)  # type: ignore[arg-type]
         return buffer.getvalue()
