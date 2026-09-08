@@ -2,6 +2,7 @@
 websockets>=13,<18
 python-dotenv>=1.0
 numpy>=1.26
+psycopg[binary]>=3.2,<4
 
 # Speech-to-text (offline)
 faster-whisper>=1.0

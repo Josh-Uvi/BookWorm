@@ -77,6 +77,26 @@ def test_guardrail_state_expected_text():
     assert session.expected_text is None
 
 
+def test_personalized_reading_context_is_available_to_prompts():
+    session = ReadingSession()
+    session.set_reading_context(
+        text="The cat sat on the mat.",
+        student_name="StudentA",
+        profile_id="student-a",
+        reading_level=2,
+        voice="Tiffany",
+        system_prompt="Use simple vocabulary and pronunciation help.",
+        book_title="The Cat in the Hat",
+    )
+
+    assert session.expected_text == "The cat sat on the mat."
+    assert session.profile_id == "student-a"
+    assert session.profile_voice == "Tiffany"
+    assert "Student: StudentA" in session.prompt_context()
+    assert "Reading level: 2" in session.prompt_context()
+    assert "Selected book: The Cat in the Hat" in session.prompt_context()
+    assert "simple vocabulary" in session.prompt_context()
+
 def test_guardrail_state_help_cooldown():
     session = ReadingSession()
     assert session.last_help_at is None

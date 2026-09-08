@@ -38,6 +38,12 @@ class ReadingSession:
         # The book passage the child is reading (shared by the client), used
         # to tell "reading aloud" apart from "talking to the assistant".
         self.expected_text: str | None = None
+        self.student_name: str | None = None
+        self.profile_id: str | None = None
+        self.reading_level: int | None = None
+        self.profile_voice: str | None = None
+        self.profile_prompt: str | None = None
+        self.book_title: str | None = None
         self._last_help_at: float | None = None
         # Silenced by the child ("stop", "shh"…): no interruptions until the
         # next direct question re-engages the assistant.
@@ -108,6 +114,41 @@ class ReadingSession:
     def set_expected_text(self, text: str) -> None:
         """Remember the passage the child is reading (blank clears it)."""
         self.expected_text = text or None
+
+    def set_reading_context(
+        self,
+        *,
+        text: str,
+        student_name: str | None = None,
+        profile_id: str | None = None,
+        reading_level: int | None = None,
+        voice: str | None = None,
+        system_prompt: str | None = None,
+        book_title: str | None = None,
+    ) -> None:
+        """Store the selected student/profile/book context for personalized help."""
+
+        self.set_expected_text(text)
+        self.student_name = student_name or None
+        self.profile_id = profile_id or None
+        self.reading_level = reading_level if reading_level in (2, 3) else None
+        self.profile_voice = voice or None
+        self.profile_prompt = system_prompt or None
+        self.book_title = book_title or None
+
+    def prompt_context(self) -> str:
+        """Return concise trusted context added to every LLM request."""
+
+        details = []
+        if self.student_name:
+            details.append(f"Student: {self.student_name}")
+        if self.reading_level:
+            details.append(f"Reading level: {self.reading_level}")
+        if self.book_title:
+            details.append(f"Selected book: {self.book_title}")
+        if self.profile_prompt:
+            details.append(f"Teaching guidance: {self.profile_prompt}")
+        return "\n".join(details) or "Use warm, age-appropriate reading support."
 
     @property
     def last_help_at(self) -> float | None:

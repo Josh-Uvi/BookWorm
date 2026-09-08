@@ -1,11 +1,27 @@
 [
   {
+    "id": "book_2_1",
+    "title": "The Cat in the Hat",
+    "author": "Dr. Seuss",
+    "coverUrl": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop",
+    "description": "A playful rhyming story for practicing short words and word families.",
+    "genre": "Rhyming Picture Book",
+    "level": 2,
+    "pages": 34,
+    "publishedYear": 1957,
+    "pdfUrl": "books/Cat-in-the-Hat.pdf",
+    "interests": ["rhymes", "adventure"],
+    "chapters": []
+  },
+  {
     "id": "1",
     "title": "Monkey Business",
     "author": "Children's Book",
     "coverUrl": "https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?w=400&h=600&fit=crop",
     "description": "A fun adventure story about monkeys and their playful antics.",
     "genre": "Children's Fiction",
+    "level": 2,
+    "pages": 28,
     "pdfUrl": "books/Monkey-Business.pdf",
     "interests": ["animals", "adventure", "nature"],
     "chapters": []
@@ -17,6 +33,8 @@
     "coverUrl": "https://images.unsplash.com/photo-1614027164847-1b28cfe1df60?w=400&h=600&fit=crop",
     "description": "An inspiring tale about a lion learning the importance of trying.",
     "genre": "Children's Fiction",
+    "level": 2,
+    "pages": 18,
     "pdfUrl": "books/the-lion-who-wouldnt-try.pdf",
     "interests": ["animals", "adventure"],
     "chapters": []
@@ -28,6 +46,8 @@
     "coverUrl": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop",
     "description": "An imaginative journey through a bathtub safari adventure.",
     "genre": "Children's Fiction",
+    "level": 2,
+    "pages": 29,
     "pdfUrl": "books/Bathtub-Safari.pdf",
     "interests": ["animals", "adventure", "nature"],
     "chapters": []

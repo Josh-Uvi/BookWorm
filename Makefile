@@ -12,7 +12,7 @@ OLLAMA_MODEL ?= qwen2.5:3b
 PIPER_VOICE ?= en_US-amy-medium
 
 .DEFAULT_GOAL := help
-.PHONY: help setup setup-venv setup-models up down restart seed logs ps dev-client dev-server \
+.PHONY: help setup setup-venv setup-models setup-books up down restart seed logs ps dev-client dev-server \
 	healthcheck test test-server test-client lint lint-server lint-client typecheck-server build prod clean \
 	deploy-gcp deploy-aws
 
@@ -50,6 +50,9 @@ setup-models: ## Pull the Ollama model and the offline Piper voice
 	@Server/.venv/bin/python Server/scripts/download_piper_voice.py \
 		--voice $(PIPER_VOICE) --out-dir Server/models \
 		|| echo "⚠️  Piper voice download skipped."
+
+setup-books: ## Create, seed, and verify the PostgreSQL books table
+	$(SERVER_PYTHON) Server/setup_books_table.py
 
 # ── Docker lifecycle ────────────────────────────────────────────────
 

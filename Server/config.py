@@ -86,6 +86,7 @@ class Settings:
     # ── Book/media storage (STORAGE_PROVIDER) ───────────────────────
     storage_provider: str = "local"         # "local" or "minio"
     media_dir: str = "media"
+    database_url: str = ""
     minio_endpoint: str = ""
     minio_access_key: str = ""
     minio_secret_key: str = ""
@@ -123,6 +124,7 @@ class Settings:
             piper_models_dir=_str("PIPER_MODELS_DIR", cls.piper_models_dir),
             storage_provider=_str("STORAGE_PROVIDER", cls.storage_provider),
             media_dir=_str("MEDIA_DIR", cls.media_dir),
+            database_url=_str("DATABASE_URL", cls.database_url),
             minio_endpoint=_str("MINIO_ENDPOINT", cls.minio_endpoint),
             minio_access_key=_str("MINIO_ACCESS_KEY", cls.minio_access_key),
             minio_secret_key=_str("MINIO_SECRET_KEY", cls.minio_secret_key),

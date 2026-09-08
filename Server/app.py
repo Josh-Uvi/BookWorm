@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
+from books_repository import PostgresBooksRepository
 from config import Settings
 from guardrails import (
     NOT_SURE_ANSWER,
@@ -42,6 +43,10 @@ logger = logging.getLogger("reading-assistant")
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _optional_string(value) -> str | None:
+    return value.strip() if isinstance(value, str) and value.strip() else None
 
 
 class ReadingAssistantServer:
@@ -114,9 +119,27 @@ class ReadingAssistantServer:
             # aloud" apart from "asking a question" (see guardrails.py).
             text = payload.get("text")
             if isinstance(text, str):
-                session.set_expected_text(text)
+                raw_level = payload.get("reading_level")
+                try:
+                    reading_level = int(raw_level) if raw_level is not None else None
+                except (TypeError, ValueError):
+                    reading_level = None
+                session.set_reading_context(
+                    text=text,
+                    student_name=_optional_string(payload.get("student_name")),
+                    profile_id=_optional_string(payload.get("profile_id")),
+                    reading_level=reading_level,
+                    voice=_optional_string(payload.get("voice")),
+                    system_prompt=_optional_string(payload.get("system_prompt")),
+                    book_title=_optional_string(payload.get("book_title")),
+                )
                 logger.info(
-                    "Context (%s): reading passage updated (%d chars)", client_id, len(text)
+                    "Context (%s): student=%s level=%s book=%s passage=%d chars",
+                    client_id,
+                    session.student_name or "unknown",
+                    session.reading_level or "unknown",
+                    session.book_title or "unknown",
+                    len(text),
                 )
         elif kind == "control":
             action = payload.get("action")
@@ -271,6 +294,7 @@ class ReadingAssistantServer:
         prompt = READING_ASSISTANT_PROMPT.format(
             text=accumulated,
             passage=session.expected_text or "(not available — no passage shared)",
+            student_context=session.prompt_context(),
         )
         try:
             verdict = await self.llm.analyze(prompt)
@@ -333,6 +357,7 @@ class ReadingAssistantServer:
         prompt = QUESTION_ANSWER_PROMPT.format(
             question=question,
             passage=session.expected_text or "(not available — no passage shared)",
+            student_context=session.prompt_context(),
         )
         try:
             verdict = await self.llm.analyze(prompt)
@@ -427,7 +452,15 @@ class ReadingAssistantServer:
         settings = self.settings
         if settings.serve_media:
             storage = build_storage(settings)
-            media = MediaServer(storage, host=settings.host, port=settings.media_port)
+            books_repository = None
+            if settings.database_url:
+                books_repository = PostgresBooksRepository(settings.database_url)
+            media = MediaServer(
+                storage,
+                host=settings.host,
+                port=settings.media_port,
+                books_repository=books_repository,
+            )
             media.start()
             logger.info("Media server listening on http://%s:%s", settings.host, media.port)
 

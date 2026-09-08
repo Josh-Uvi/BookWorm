@@ -38,7 +38,9 @@ TTSClient.synthesize(help_message) (ai/tts.py — piper | edge_tts)
 | `ai/llm.py` | `OllamaLLM` (OpenAI-compatible Chat Completions) + robust JSON parsing |
 | `ai/tts.py` | `PiperTTS` (offline, default — voice baked into the Docker image) and `EdgeTTS` (online fallback) |
 | `session.py` | Per-client audio buffer, epoch rotation, transcript accumulation, analysis timing |
-| `media_server.py` | stdlib HTTP: `/health`, `/books.json`, `/books/*` |
+| `media_server.py` | stdlib HTTP: `/health`, `/api/books?level=2|3`, `/books.json`, `/books/*` |
+| `books_repository.py` | PostgreSQL access for level-filtered book metadata |
+| `setup_books_table.py` | Idempotent table creation, sample seeding, and verification |
 | `storage.py` | `LocalStorage` (disk) / `MinioStorage` (S3-compatible) |
 | `prompts.py` | The reading-assistant prompt and its strict JSON contract |
 | `healthcheck.py` | Setup verification (replaces the old AWS credential checker) |

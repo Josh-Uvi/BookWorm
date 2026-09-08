@@ -23,12 +23,16 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL_DOCKER:-http://ollama:11434/v1}
       MEDIA_DIR: /data/media
       PIPER_MODELS_DIR: /app/models
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reader}:${POSTGRES_PASSWORD:-reader}@postgres:5432/${POSTGRES_DB:-reading_assistant}
     volumes:
       - media:/data/media # books (seeded from ./media by `make up`)
       - piper-models:/app/models # Piper voices (seeded from ./Server/models)
       - model-cache:/root/.cache # faster-whisper model downloads
     depends_on:
-      - ollama
+      ollama:
+        condition: service_started
+      books-setup:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   client:
@@ -37,6 +41,7 @@ services:
       args:
         VITE_WS_URL: ${VITE_WS_URL:-}
         VITE_MEDIA_URL: ${VITE_MEDIA_URL:-/media}
+        VITE_API_URL: ${VITE_API_URL:-/api}
     ports:
       - "8080:80"
     depends_on:
@@ -50,6 +55,33 @@ services:
     volumes:
       - ollama:/root/.ollama
     restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-reading_assistant}
+      POSTGRES_USER: ${POSTGRES_USER:-reader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reader}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-reader} -d ${POSTGRES_DB:-reading_assistant}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  books-setup:
+    build: ./Server
+    command: ["python", "setup_books_table.py"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reader}:${POSTGRES_PASSWORD:-reader}@postgres:5432/${POSTGRES_DB:-reading_assistant}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   minio:
     image: minio/minio:latest
@@ -71,4 +103,5 @@ volumes:
   model-cache:
   ollama:
   minio:
+  postgres-data:
 

@@ -13,3 +13,6 @@ services:
 
   ollama:
     ports: !override []
+
+  postgres:
+    ports: !override []

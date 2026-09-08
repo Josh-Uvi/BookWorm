@@ -5,6 +5,9 @@
 # client has not shared the on-screen chapter text).
 READING_ASSISTANT_PROMPT = """You are a patient, encouraging reading assistant for children.
 
+Personalized session context:
+{student_context}
+
 The child is either READING ALOUD from their book, or SPEAKING TO YOU — asking
 a question or asking for help. First decide which of the two is happening.
 
@@ -39,7 +42,12 @@ Respond ONLY with valid JSON in this exact format:
 # Kept short and directive on purpose: the default local model is small
 # (qwen2.5:3b), and long rule lists make small models echo instructions back instead
 # of answering (verified against the live model).
-QUESTION_ANSWER_PROMPT = """You are a friendly helper for a child who is reading this story:
+QUESTION_ANSWER_PROMPT = """You are a friendly helper for a child who is reading this story.
+
+Personalized session context:
+{student_context}
+
+Story:
 
 "{passage}"
 
