@@ -45,9 +45,9 @@ one clip.
 
 | Student login | Book selection |
 |---|---|
-| [![Student login](docs/assets/01-student-login.png)](docs/assets/reading-assistant-flow-demo.mp4) | [![Book selection](docs/assets/02-book-selection.png)](docs/assets/reading-assistant-flow-demo.mp4) |
+| [![Student login](docs/assets/01-student-login.png)](docs/assets/01-student-login.png) | [![Book selection](docs/assets/02-book-selection.png)](docs/assets/02-book-selection.png) |
 | **Reading session** | **Profile & reading history** |
-| [![Reading session](docs/assets/03-reading-session.png)](docs/assets/reading-assistant-flow-demo.mp4) | [![Profile history](docs/assets/04-profile-history.png)](docs/assets/reading-assistant-flow-demo.mp4) |
+| [![Reading session](docs/assets/03-reading-session.png)](docs/assets/03-reading-session.png) | [![Profile history](docs/assets/04-profile-history.png)](docs/assets/04-profile-history.png) |
 
 *(Click any screenshot or the link above to play the video — GitHub does not inline
 repo-local MP4 files.)*
