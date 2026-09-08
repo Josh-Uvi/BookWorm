@@ -24,7 +24,12 @@ import BookSelection from "./components/BookSelection";
 
 const queryClient = new QueryClient();
 
-function ReadingFlow() {
+/**
+ * Shared controller for the student flow routes: /login -> /books -> /reading.
+ * All three routes render this component so navigation and app state stay in
+ * sync through the single ReadingFlowContext source of truth.
+ */
+function StudentFlow() {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentStudent, selectedBook, login, selectBook } = useReadingFlow();
@@ -38,34 +43,45 @@ function ReadingFlow() {
   }, [location.pathname, location.search, navigate, selectedBook]);
 
   if (!currentStudent) {
-    if (location.pathname === "/reading") {
-      return <Navigate to="/" replace />;
+    // Protected flow: everything except the login step requires a session.
+    if (location.pathname !== "/login") {
+      return <Navigate to="/login" replace />;
     }
     return (
       <StudentLogin
         onLogin={(student) => {
           login(student);
-          // Keep the current route until a book is chosen. This means entering
-          // through either `/` or `/reading` uses the exact same flow state.
+          navigate("/books");
         }}
       />
     );
   }
-  if (!selectedBook) {
+
+  if (location.pathname === "/login") {
+    // Already signed in — skip straight to book selection.
+    return <Navigate to="/books" replace />;
+  }
+
+  if (location.pathname === "/reading") {
+    if (!selectedBook) {
+      return <Navigate to="/books" replace />;
+    }
     return (
-      <BookSelection
+      <Reading
         student={currentStudent}
-        onSelect={(book) => {
-          selectBook(book);
-          navigate(`/reading?book=${encodeURIComponent(book.id)}`);
-        }}
+        selectedBook={selectedBook}
       />
     );
   }
+
+  // /books
   return (
-    <Reading
+    <BookSelection
       student={currentStudent}
-      selectedBook={selectedBook}
+      onSelect={(book) => {
+        selectBook(book);
+        navigate(`/reading?book=${encodeURIComponent(book.id)}`);
+      }}
     />
   );
 }
@@ -80,10 +96,12 @@ const App = () => (
           <ReadingFlowProvider>
             <Navbar />
             <Routes>
-              <Route path="/" element={<ReadingFlow />} />
-              <Route path="/welcome" element={<Landing />} />
+              <Route path="/" element={<Landing />} />
+              <Route path="/welcome" element={<Navigate to="/" replace />} />
+              <Route path="/login" element={<StudentFlow />} />
+              <Route path="/books" element={<StudentFlow />} />
+              <Route path="/reading" element={<StudentFlow />} />
               <Route path="/interests" element={<Interests />} />
-              <Route path="/reading" element={<ReadingFlow />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

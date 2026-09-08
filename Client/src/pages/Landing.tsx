@@ -84,11 +84,11 @@ const Landing = () => {
             >
               <Button
                 size="lg"
-                onClick={() => navigate("/interests")}
+                onClick={() => navigate("/login")}
                 className="group bg-gradient-primary hover:opacity-90 text-primary-foreground px-8"
               >
-                Choose Your Interests
-                <Sparkles className="ml-2 h-4 w-4" />
+                Get Started
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Button>
             </motion.div>
           </motion.div>

@@ -67,7 +67,7 @@ const Profile = () => {
   }, [currentStudent?.description, currentStudent?.displayName]);
 
   if (!currentStudent) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   const profile = {

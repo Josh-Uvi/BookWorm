@@ -40,7 +40,8 @@ credentials required:
 ## See it in action
 
 ▶ **[Watch the full app flow (MP4)](docs/assets/reading-assistant-flow-demo.mp4)** —
-**Student Login → Book Selection → Reading Session → Profile & Reading History** in one clip.
+**Landing → Student Login → Book Selection → Reading Session → Profile & Reading History** in
+one clip.
 
 | Student login | Book selection |
 |---|---|
@@ -64,15 +65,16 @@ transcript appears in the sidebar and the assistant speaks an encouraging reply.
 
 ### Student reading flow
 
-The default route now guides children through **Student Login → Level-based Book Selection →
-Reading Session**. StudentA receives Level 2 beginning-reader support with the Tiffany voice,
-while StudentB receives Level 3 comprehension support with the Amy voice. Book metadata comes
-from `GET /api/books?level=2|3`, backed by PostgreSQL in Docker and built-in mock data when the
-database or API is unavailable.
+The app now guides children through **Landing (/) → Student Login (/login) → Level-based Book
+Selection (/books) → Reading Session (/reading) → Profile (/profile)**, with **Logout** on the
+Profile page returning to the landing page. StudentA receives Level 2 beginning-reader support
+with the Tiffany voice, while StudentB receives Level 3 comprehension support with the Amy
+voice. Book metadata comes from `GET /api/books?level=2|3`, backed by PostgreSQL in Docker and
+built-in mock data when the database or API is unavailable.
 
-The reading route is session-protected and intentionally omitted from the navbar. During an
-active student session, the navbar shows that student's profile and disables the Bookworm home
-link; use **Logout** on the Profile page to clear the session.
+The books and reading routes are session-protected and intentionally omitted from the navbar.
+During an active student session, the navbar shows that student's profile and disables the
+Bookworm home link; use **Logout** on the Profile page to clear the session.
 
 Every reading session records progress into the shared flow context, and the Profile page's
 **History** tab renders it with self-contained book snapshots (title, author, chapter, level)

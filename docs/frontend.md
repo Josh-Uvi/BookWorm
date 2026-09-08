@@ -8,10 +8,12 @@ narration with synchronized word highlighting.
 ## Stack
 
 - **Vite 5** dev server (port 8080) with `/ws` and `/media` dev proxies
-- **react-router-dom** routes: `/` (Reading flow: Student Login → Book Selection → Reading
-  Session), `/profile`, 404. `/reading` renders the same protected flow controller and is
-  intentionally omitted from the navbar — it is reachable only with an active student session
-  (book deep-links like `/reading?book=book_2_1` redirect to `/` otherwise)
+- **react-router-dom** routes: `/` (landing page) → `/login` (Student Login) → `/books`
+  (Book Selection) → `/reading` (Reading Session) → `/profile`, plus 404. `/login`, `/books`,
+  and `/reading` render one shared protected flow controller; `/books` and `/reading` are
+  intentionally omitted from the navbar and are reachable only with an active student session
+  (unauthenticated visits redirect to `/login`, and `/reading` without a chosen book falls
+  back to `/books`). `/welcome` redirects to `/` for backward compatibility
 - **@tanstack/react-query**, **framer-motion**, **lucide-react**, shadcn/ui components
 - **vitest** + **@testing-library** for tests
 
@@ -74,10 +76,13 @@ cross-document text, so it hides the ineffective settings/read-along controls fo
 | `src/services/wsMessages.ts` | Pure parser for server messages (unit-tested) |
 | `src/components/StudentLogin.tsx` | Child-friendly StudentA/StudentB reading-profile login |
 | `src/components/BookSelection.tsx` | Level-filtered book cards, loading/error states, and single selection |
-| `src/contexts/ReadingFlowContext.tsx` | Shared, session-persisted student/book/reading-history state used by `/`, `/reading`, the navbar, and profile-page logout |
+| `src/contexts/ReadingFlowContext.tsx` | Shared, session-persisted student/book/reading-history state used by `/login`, `/books`, `/reading`, the navbar, and profile-page logout |
 | `src/contexts/readingFlowState.ts` | Pure reducer (unit-tested): login, book selection, progress upsert, clear-history, switch-student |
 | `src/services/bookService.ts` | Loads `/api/books?level=X` and `/media/books.json`; resolves media URLs; provides bundled fallback data |
+| `src/pages/Landing.tsx` | Public entry page at `/`; **Get Started** sends visitors to `/login` |
 | `src/pages/Reading.tsx` | PDF branch (iframe) and chapter branch + assistant sidebar & floating controls |
+| `src/pages/Profile.tsx` | Student profile editing, reading history with **Clear History**, and the single **Logout** (returns to `/`) |
+| `src/components/Navbar.tsx` | Session-aware navigation: hides `/books`/`/reading`, shows the student profile link, disables the brand during a session |
 | `src/types/index.ts` | Domain types incl. `TranscriptionEvent`, `HelpEvent`, `AssistantStatus` |
 
 ## Environment variables
@@ -131,4 +136,6 @@ static fixtures. `Reading.tsx` records each chapter's progress with a book snaps
 (`bookTitle`, `bookAuthor`, `bookCoverUrl`, `chapterTitle`, `readingLevel`) so the Profile
 page's **History** tab renders real media/API books without consulting bundled sample data.
 Entries upsert per book+chapter, **Clear History** empties the list, and switching or logging
-out a student clears it with the session.
+out a student clears it with the session. **Logout** lives on the Profile page and returns to
+the landing page at `/`; the legacy `/welcome` route redirects there for backward
+compatibility.
