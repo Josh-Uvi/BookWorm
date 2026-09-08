@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { 
   User, 
   Edit2, 
@@ -65,10 +65,6 @@ const Profile = () => {
     setEditedName(currentStudent?.displayName ?? "");
     setEditedBio(currentStudent?.description ?? "");
   }, [currentStudent?.description, currentStudent?.displayName]);
-
-  if (!currentStudent) {
-    return <Navigate to="/login" replace />;
-  }
 
   const profile = {
     name: currentStudent.displayName,

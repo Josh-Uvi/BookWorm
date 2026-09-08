@@ -72,7 +72,7 @@ with the Tiffany voice, while StudentB receives Level 3 comprehension support wi
 voice. Book metadata comes from `GET /api/books?level=2|3`, backed by PostgreSQL in Docker and
 built-in mock data when the database or API is unavailable.
 
-The books and reading routes are session-protected and intentionally omitted from the navbar.
+The books, reading, interests, and profile routes are session-protected; books and reading are intentionally omitted from the navbar.
 During an active student session, the navbar shows that student's profile and disables the
 Bookworm home link; use **Logout** on the Profile page to clear the session.
 

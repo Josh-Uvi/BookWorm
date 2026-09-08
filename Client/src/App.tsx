@@ -86,6 +86,18 @@ function StudentFlow() {
   );
 }
 
+/**
+ * Route guard for session-protected pages outside the student flow
+ * (e.g. /interests, /profile). Redirects to /login without a session.
+ */
+function RequireStudent({ children }: { children: React.ReactNode }) {
+  const { currentStudent } = useReadingFlow();
+  if (!currentStudent) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="system">
@@ -101,8 +113,22 @@ const App = () => (
               <Route path="/login" element={<StudentFlow />} />
               <Route path="/books" element={<StudentFlow />} />
               <Route path="/reading" element={<StudentFlow />} />
-              <Route path="/interests" element={<Interests />} />
-              <Route path="/profile" element={<Profile />} />
+              <Route
+                path="/interests"
+                element={
+                  <RequireStudent>
+                    <Interests />
+                  </RequireStudent>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <RequireStudent>
+                    <Profile />
+                  </RequireStudent>
+                }
+              />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </ReadingFlowProvider>

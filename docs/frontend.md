@@ -10,7 +10,8 @@ narration with synchronized word highlighting.
 - **Vite 5** dev server (port 8080) with `/ws` and `/media` dev proxies
 - **react-router-dom** routes: `/` (landing page) → `/login` (Student Login) → `/books`
   (Book Selection) → `/reading` (Reading Session) → `/profile`, plus 404. `/login`, `/books`,
-  and `/reading` render one shared protected flow controller; `/books` and `/reading` are
+  and `/reading` render one shared protected flow controller; `/books`, `/reading`, `/interests`,
+  and `/profile` are
   intentionally omitted from the navbar and are reachable only with an active student session
   (unauthenticated visits redirect to `/login`, and `/reading` without a chosen book falls
   back to `/books`). `/welcome` redirects to `/` for backward compatibility
