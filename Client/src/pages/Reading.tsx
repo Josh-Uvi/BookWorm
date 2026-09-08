@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Headphones,
   Loader2,
-  LogOut,
   MessageSquare,
   Mic,
   MicOff,
@@ -83,7 +82,6 @@ interface AssistantSidebarProps {
   onClose: () => void;
   student?: StudentProfile;
   book?: Book | null;
-  onSwitchStudent?: () => void;
 }
 
 const AssistantSidebar = ({
@@ -100,7 +98,6 @@ const AssistantSidebar = ({
   onClose,
   student,
   book,
-  onSwitchStudent,
 }: AssistantSidebarProps) => {
   const feedEndRef = useRef<HTMLDivElement>(null);
 
@@ -136,11 +133,6 @@ const AssistantSidebar = ({
             You’re reading <span className="font-semibold text-foreground">{book?.title}</span> with
             {` ${student.voice}`} voice support.
           </p>
-          {onSwitchStudent && (
-            <Button variant="outline" size="sm" onClick={onSwitchStudent} className="mt-3 w-full rounded-full">
-              <LogOut className="mr-2 h-4 w-4" /> Switch Student
-            </Button>
-          )}
         </div>
       )}
 
@@ -219,10 +211,9 @@ const AssistantSidebar = ({
 interface ReadingProps {
   student?: StudentProfile;
   selectedBook?: Book;
-  onSwitchStudent?: () => void;
 }
 
-const Reading = ({ student, selectedBook, onSwitchStudent }: ReadingProps) => {
+const Reading = ({ student, selectedBook }: ReadingProps) => {
   const [searchParams] = useSearchParams();
   const bookId = selectedBook?.id ?? searchParams.get("book") ?? "1";
   const [book, setBook] = useState<Book | null>(selectedBook ?? null);
@@ -390,7 +381,6 @@ const Reading = ({ student, selectedBook, onSwitchStudent }: ReadingProps) => {
             onClose={() => setIsAssistantOpen(false)}
             student={student}
             book={book}
-            onSwitchStudent={onSwitchStudent}
           />
         </motion.div>
       )}

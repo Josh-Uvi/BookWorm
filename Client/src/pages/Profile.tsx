@@ -13,7 +13,8 @@ import {
   Moon,
   Sun,
   Sparkles,
-  Star
+  Star,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +54,7 @@ const defaultPreferences: UserPreferences = {
 const Profile = () => {
   const navigate = useNavigate();
   const { setTheme } = useTheme();
-  const { currentStudent, selectedBook, updateStudent } = useReadingFlow();
+  const { currentStudent, selectedBook, updateStudent, switchStudent } = useReadingFlow();
   const [preferences, setPreferences] = useLocalStorage<UserPreferences>("user-preferences", defaultPreferences);
   const [readingHistory] = useLocalStorage<ReadingProgress[]>("reading-history", []);
   const [selectedInterests, setSelectedInterests] = useLocalStorage<string[]>("user-interests", []);
@@ -89,6 +90,11 @@ const Profile = () => {
       avatarUrl: currentStudent.avatarUrl,
     });
     setIsEditing(false);
+  };
+
+  const handleLogout = () => {
+    switchStudent();
+    navigate("/", { replace: true });
   };
 
   const getBookById = (bookId: string) => {
@@ -159,19 +165,30 @@ const Profile = () => {
                         {currentStudent.voice} voice
                       </span>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditedName(profile.name);
-                        setEditedBio(profile.bio);
-                        setIsEditing(true);
-                      }}
-                      className="border-border hover:bg-surface"
-                    >
-                      <Edit2 className="h-4 w-4 mr-2" />
-                      Edit Profile
-                    </Button>
+                    <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditedName(profile.name);
+                          setEditedBio(profile.bio);
+                          setIsEditing(true);
+                        }}
+                        className="border-border hover:bg-surface"
+                      >
+                        <Edit2 className="h-4 w-4 mr-2" />
+                        Edit Profile
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleLogout}
+                        className="rounded-full px-4"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </Button>
+                    </div>
                   </>
                 )}
               </div>
@@ -455,8 +472,8 @@ const Profile = () => {
                       </SelectContent>
                     </Select>
                     <p className="mt-2 text-xs text-muted-foreground">
-                      Reading level comes from the active student session. Use Switch Student in
-                      the reading session to choose another profile.
+                      Reading level comes from the active student session. Logout from this
+                      profile page to choose another student.
                     </p>
                   </div>
                 </div>

@@ -58,7 +58,7 @@ database or API is unavailable.
 
 The reading route is session-protected and intentionally omitted from the navbar. During an
 active student session, the navbar shows that student's profile and disables the Bookworm home
-link; use **Switch Student** inside the reading session to clear the session.
+link; use **Logout** on the Profile page to clear the session.
 
 ### Reading controls
 

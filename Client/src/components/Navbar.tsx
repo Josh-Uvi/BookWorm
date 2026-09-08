@@ -40,7 +40,7 @@ export function Navbar() {
               className="flex cursor-default items-center gap-2"
               aria-label="Bookworm navigation disabled during an active student session"
               aria-disabled="true"
-              title="Use Switch Student in the reading session to sign out"
+              title="Open the student profile to log out"
             >
               {brand}
             </div>

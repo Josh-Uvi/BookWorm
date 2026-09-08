@@ -71,7 +71,7 @@ cross-document text, so it hides the ineffective settings/read-along controls fo
 | `src/services/wsMessages.ts` | Pure parser for server messages (unit-tested) |
 | `src/components/StudentLogin.tsx` | Child-friendly StudentA/StudentB reading-profile login |
 | `src/components/BookSelection.tsx` | Level-filtered book cards, loading/error states, and single selection |
-| `src/contexts/ReadingFlowContext.tsx` | Shared, session-persisted student/book state used by `/`, `/reading`, the navbar, and profile page |
+| `src/contexts/ReadingFlowContext.tsx` | Shared, session-persisted student/book state used by `/`, `/reading`, the navbar, and profile-page logout |
 | `src/services/bookService.ts` | Loads `/api/books?level=X` and `/media/books.json`; resolves media URLs; provides bundled fallback data |
 | `src/pages/Reading.tsx` | PDF branch (iframe) and chapter branch + assistant sidebar & floating controls |
 | `src/types/index.ts` | Domain types incl. `TranscriptionEvent`, `HelpEvent`, `AssistantStatus` |

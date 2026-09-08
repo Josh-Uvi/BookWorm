@@ -27,7 +27,7 @@ const queryClient = new QueryClient();
 function ReadingFlow() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentStudent, selectedBook, login, selectBook, switchStudent } = useReadingFlow();
+  const { currentStudent, selectedBook, login, selectBook } = useReadingFlow();
 
   useEffect(() => {
     if (location.pathname !== "/reading" || !selectedBook) return;
@@ -66,10 +66,6 @@ function ReadingFlow() {
     <Reading
       student={currentStudent}
       selectedBook={selectedBook}
-      onSwitchStudent={() => {
-        switchStudent();
-        navigate("/");
-      }}
     />
   );
 }
