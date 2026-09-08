@@ -39,9 +39,9 @@ credentials required:
 
 ## See it in action
 
-▶ **[Watch the full app flow (MP4)](docs/assets/reading-assistant-flow-demo.mp4)** —
-**Landing → Student Login → Book Selection → Reading Session → Profile & Reading History** in
-one clip.
+**Landing → Student Login → Book Selection → Reading Session → Profile & Reading History** in one clip.
+
+![App flow demo](docs/assets/reading-assistant-flow-demo.gif)
 
 | Student login | Book selection |
 |---|---|
