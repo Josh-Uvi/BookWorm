@@ -3,12 +3,13 @@
  * captures microphone audio, streams it to the WebSocket server, shows the
  * live transcript, and plays spoken help when the child struggles.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
+  Headphones,
   Loader2,
   MessageSquare,
   Mic,
@@ -17,6 +18,7 @@ import {
   Plus,
   Settings,
   Sparkles,
+  Square,
   Trash2,
   Volume2,
   X,
@@ -26,9 +28,11 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
+import HighlightedText from "@/components/HighlightedText";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useReadingAssistant } from "@/hooks/useReadingAssistant";
+import { tokenizeSpeechText, useSpeechReader } from "@/hooks/useSpeechReader";
 import { useToast } from "@/hooks/use-toast";
 import { fetchReadableBook } from "@/services/bookService";
 import {
@@ -204,6 +208,7 @@ const Reading = () => {
 
   const assistant = useReadingAssistant();
   const recorder = useAudioRecorder({ onChunk: assistant.sendAudio });
+  const speech = useSpeechReader();
 
   useEffect(() => {
     const loadBook = async () => {
@@ -230,6 +235,12 @@ const Reading = () => {
   const progress = chapters.length
     ? Math.round(((chapterIndex + 1) / chapters.length) * 100)
     : 0;
+
+  // Word tokens for the on-screen chapter text, used for read-along highlighting.
+  const chapterTokens = useMemo(
+    () => tokenizeSpeechText(currentChapter?.content ?? ""),
+    [currentChapter?.content]
+  );
 
   // Persist reading progress when the chapter changes.
   useEffect(() => {
@@ -262,6 +273,34 @@ const Reading = () => {
       void recorder.start();
     }
   };
+
+  const toggleReadAlong = () => {
+    if (speech.isReading) {
+      speech.stop();
+      return;
+    }
+    if (!currentChapter) return;
+    // Pause the mic so the assistant doesn't transcribe the narrator's voice.
+    if (recorder.isRecording) recorder.stop();
+    speech.start(currentChapter.content, chapterTokens);
+  };
+
+  // Stop the read-along narration when the chapter or book changes.
+  useEffect(() => {
+    speech.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookId, currentChapter?.id]);
+
+  // Tell the server what's on screen so its guardrails can tell "reading
+  // aloud" apart from "asking a question" and it only speaks up when the
+  // child actually talks to it. Sent when the mic turns on and whenever the
+  // chapter changes while recording.
+  useEffect(() => {
+    if (recorder.isRecording && currentChapter) {
+      assistant.sendContext(currentChapter.content);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.isRecording, currentChapter?.id]);
 
   const assistantSidebar = (
     <AnimatePresence>
@@ -303,6 +342,25 @@ const Reading = () => {
             <MessageSquare className="h-5 w-5" />
           </Button>
         </motion.div>
+      )}
+      {!book?.pdfUrl && currentChapter && (
+        <Button
+          onClick={toggleReadAlong}
+          disabled={!speech.isSupported}
+          aria-label={speech.isReading ? "Stop read-along" : "Read the story aloud"}
+          title={
+            speech.isSupported
+              ? speech.isReading
+                ? "Stop read-along"
+                : "Read the story aloud with word highlighting"
+              : (speech.unsupportedReason ?? "Text-to-speech unavailable")
+          }
+          className={`h-12 w-12 rounded-full shadow-lg ${
+            speech.isReading ? "bg-red-500 hover:bg-red-600" : "bg-primary hover-glow"
+          }`}
+        >
+          {speech.isReading ? <Square className="h-5 w-5" /> : <Headphones className="h-5 w-5" />}
+        </Button>
       )}
       <Button
         onClick={toggleMic}
@@ -447,9 +505,10 @@ const Reading = () => {
                   }}
                 >
                   <h2 className="text-2xl font-semibold mb-6">{currentChapter.title}</h2>
-                  <div className="whitespace-pre-wrap leading-relaxed">
-                    {currentChapter.content}
-                  </div>
+                  <HighlightedText
+                    tokens={chapterTokens}
+                    activeTokenIndex={speech.activeWordIndex}
+                  />
                 </motion.article>
                 <div className="flex items-center justify-between">
                   <Button

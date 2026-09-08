@@ -130,12 +130,31 @@ export function useReadingAssistant(options: UseReadingAssistantOptions = {}) {
     }
   }, []);
 
+  /** Share the on-screen passage so the server can tell "reading aloud"
+   * apart from "asking a question" and avoid interrupting the child. */
+  const sendContext = useCallback((text: string) => {
+    const socket = socketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "context", text }));
+    }
+  }, []);
+
   useEffect(() => {
     if (autoConnect) connect();
     return () => disconnect();
   }, [autoConnect, connect, disconnect]);
 
-  return { status, lastError, transcript, helpMessages, sendAudio, connect, disconnect, clearTranscript };
+  return {
+    status,
+    lastError,
+    transcript,
+    helpMessages,
+    sendAudio,
+    sendContext,
+    connect,
+    disconnect,
+    clearTranscript,
+  };
 }
 
 function playHelpAudio(help: HelpEvent) {
