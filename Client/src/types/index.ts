@@ -45,6 +45,12 @@ export interface ReadingProgress {
   chapterId: string;
   progress: number;
   lastRead: string;
+  /** Book snapshot so history renders without looking books up in static fixtures. */
+  bookTitle?: string;
+  bookAuthor?: string;
+  bookCoverUrl?: string;
+  chapterTitle?: string;
+  readingLevel?: 2 | 3;
 }
 
 export interface UserPreferences {

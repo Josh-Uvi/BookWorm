@@ -15,6 +15,7 @@ import {
   Sparkles,
   Star,
   LogOut,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useTheme } from "@/hooks/useTheme";
-import { UserPreferences, ReadingProgress } from "@/types";
+import { UserPreferences } from "@/types";
 import { useReadingFlow } from "@/contexts/ReadingFlowContext";
-import { sampleBooks } from "@/data/sampleBooks";
 
 const interests = [
   { id: "animals", emoji: "🦁", label: "Animals", color: "from-orange-400 to-yellow-400" },
@@ -54,9 +54,8 @@ const defaultPreferences: UserPreferences = {
 const Profile = () => {
   const navigate = useNavigate();
   const { setTheme } = useTheme();
-  const { currentStudent, selectedBook, updateStudent, switchStudent } = useReadingFlow();
+  const { currentStudent, readingHistory, clearHistory, updateStudent, switchStudent } = useReadingFlow();
   const [preferences, setPreferences] = useLocalStorage<UserPreferences>("user-preferences", defaultPreferences);
-  const [readingHistory] = useLocalStorage<ReadingProgress[]>("reading-history", []);
   const [selectedInterests, setSelectedInterests] = useLocalStorage<string[]>("user-interests", []);
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(currentStudent?.displayName ?? "");
@@ -95,11 +94,6 @@ const Profile = () => {
   const handleLogout = () => {
     switchStudent();
     navigate("/", { replace: true });
-  };
-
-  const getBookById = (bookId: string) => {
-    if (selectedBook?.id === bookId) return selectedBook;
-    return sampleBooks.find((book) => book.id === bookId);
   };
 
   return (
@@ -281,11 +275,28 @@ const Profile = () => {
             {/* Reading History Tab */}
             <TabsContent value="history">
               <div className="glass-effect rounded-xl p-6">
-                <h2 className="text-xl font-semibold mb-6 flex items-center text-foreground">
-                  <BookOpen className="h-5 w-5 mr-2 text-primary" />
-                  Reading History
-                </h2>
-                
+                <div className="flex items-center justify-between gap-4 mb-6">
+                  <h2 className="text-xl font-semibold flex items-center text-foreground">
+                    <BookOpen className="h-5 w-5 mr-2 text-primary" />
+                    Reading History
+                  </h2>
+                  {readingHistory.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (window.confirm("Clear your entire reading history?")) {
+                          clearHistory();
+                        }
+                      }}
+                      className="shrink-0 border-border text-muted-foreground hover:text-destructive hover:border-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Clear History
+                    </Button>
+                  )}
+                </div>
+
                 {readingHistory.length === 0 ? (
                   <div className="text-center py-12">
                     <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -299,24 +310,27 @@ const Profile = () => {
                 ) : (
                   <div className="space-y-4">
                     {readingHistory.map((progress) => {
-                      const book = getBookById(progress.bookId);
-                      if (!book) return null;
-                      
                       return (
                         <motion.div
-                          key={progress.bookId}
+                          key={`${progress.bookId}-${progress.chapterId}`}
                           whileHover={{ x: 5 }}
                           className="flex items-center gap-4 p-4 rounded-lg bg-surface hover:bg-surface-hover cursor-pointer"
-                          onClick={() => navigate(`/reading?book=${book.id}`)}
+                          onClick={() => navigate(`/reading?book=${progress.bookId}`)}
                         >
                           <img
-                            src={book.coverUrl}
-                            alt={book.title}
+                            src={progress.bookCoverUrl}
+                            alt={progress.bookTitle ?? progress.bookId}
                             className="h-16 w-12 rounded object-cover"
                           />
-                          <div className="flex-1">
-                            <h3 className="font-medium text-foreground">{book.title}</h3>
-                            <p className="text-sm text-muted-foreground">{book.author}</p>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-medium text-foreground truncate">
+                              {progress.bookTitle ?? progress.bookId}
+                            </h3>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {[progress.bookAuthor, progress.chapterTitle]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
                             <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
                               <div
                                 className="h-full rounded-full bg-gradient-primary"

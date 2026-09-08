@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from "react";
-import { Book, StudentProfile } from "@/types";
+import { Book, ReadingProgress, StudentProfile } from "@/types";
 import {
   initialReadingFlowState,
   readingFlowReducer,
@@ -18,6 +18,7 @@ function restoreState(): ReadingFlowState {
     return {
       currentStudent,
       selectedBook: currentStudent ? (parsed.selectedBook ?? null) : null,
+      readingHistory: currentStudent ? (parsed.readingHistory ?? []) : [],
     };
   } catch {
     return initialReadingFlowState;
@@ -31,6 +32,8 @@ interface ReadingFlowContextValue extends ReadingFlowState {
   ) => void;
   selectBook: (book: Book) => void;
   clearBook: () => void;
+  recordProgress: (entry: ReadingProgress) => void;
+  clearHistory: () => void;
   switchStudent: () => void;
 }
 
@@ -58,6 +61,8 @@ export function ReadingFlowProvider({ children }: { children: React.ReactNode })
       updateStudent: (updates) => dispatch({ type: "update-student", updates }),
       selectBook: (book) => dispatch({ type: "select-book", book }),
       clearBook: () => dispatch({ type: "clear-book" }),
+      recordProgress: (entry) => dispatch({ type: "record-progress", entry }),
+      clearHistory: () => dispatch({ type: "clear-history" }),
       switchStudent: () => dispatch({ type: "switch-student" }),
     }),
     [state]

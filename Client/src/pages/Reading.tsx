@@ -34,12 +34,12 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { isAssistantReady, useReadingAssistant } from "@/hooks/useReadingAssistant";
 import { tokenizeSpeechText, useSpeechReader } from "@/hooks/useSpeechReader";
 import { useToast } from "@/hooks/use-toast";
+import { useReadingFlow } from "@/contexts/ReadingFlowContext";
 import { fetchReadableBook } from "@/services/bookService";
 import {
   AssistantStatus,
   Book,
   HelpEvent,
-  ReadingProgress,
   TranscriptionEvent,
   UserPreferences,
   StudentProfile,
@@ -224,7 +224,7 @@ const Reading = ({ student, selectedBook }: ReadingProps) => {
   const [isAssistantOpen, setIsAssistantOpen] = useState(true);
   const [areControlsCollapsed, setAreControlsCollapsed] = useState(false);
   const [preferences] = useLocalStorage<UserPreferences>("user-preferences", defaultPreferences);
-  const [, setReadingHistory] = useLocalStorage<ReadingProgress[]>("reading-history", []);
+  const { recordProgress } = useReadingFlow();
   const [localFontSize, setLocalFontSize] = useState(preferences.fontSize);
 
   const assistant = useReadingAssistant({
@@ -278,23 +278,16 @@ const Reading = ({ student, selectedBook }: ReadingProps) => {
   // Persist reading progress when the chapter changes.
   useEffect(() => {
     if (!book || !currentChapter) return;
-    setReadingHistory((prev) => {
-      const updated = [...prev];
-      const existing = updated.findIndex(
-        (item) => item.bookId === book.id && item.chapterId === currentChapter.id
-      );
-      const entry: ReadingProgress = {
-        bookId: book.id,
-        chapterId: currentChapter.id,
-        progress,
-        lastRead: new Date().toISOString(),
-      };
-      if (existing >= 0) {
-        updated[existing] = entry;
-      } else {
-        updated.push(entry);
-      }
-      return updated;
+    recordProgress({
+      bookId: book.id,
+      chapterId: currentChapter.id,
+      progress,
+      lastRead: new Date().toISOString(),
+      bookTitle: book.title,
+      bookAuthor: book.author,
+      bookCoverUrl: book.coverUrl,
+      chapterTitle: currentChapter.title,
+      readingLevel: book.level,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book?.id, currentChapter?.id]);
