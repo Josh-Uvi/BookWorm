@@ -8,7 +8,10 @@ narration with synchronized word highlighting.
 ## Stack
 
 - **Vite 5** dev server (port 8080) with `/ws` and `/media` dev proxies
-- **react-router-dom** routes: `/` (Landing), `/interests`, `/reading`, `/profile`, 404
+- **react-router-dom** routes: `/` (Reading flow: Student Login → Book Selection → Reading
+  Session), `/profile`, 404. `/reading` renders the same protected flow controller and is
+  intentionally omitted from the navbar — it is reachable only with an active student session
+  (book deep-links like `/reading?book=book_2_1` redirect to `/` otherwise)
 - **@tanstack/react-query**, **framer-motion**, **lucide-react**, shadcn/ui components
 - **vitest** + **@testing-library** for tests
 
@@ -71,7 +74,8 @@ cross-document text, so it hides the ineffective settings/read-along controls fo
 | `src/services/wsMessages.ts` | Pure parser for server messages (unit-tested) |
 | `src/components/StudentLogin.tsx` | Child-friendly StudentA/StudentB reading-profile login |
 | `src/components/BookSelection.tsx` | Level-filtered book cards, loading/error states, and single selection |
-| `src/contexts/ReadingFlowContext.tsx` | Shared, session-persisted student/book state used by `/`, `/reading`, the navbar, and profile-page logout |
+| `src/contexts/ReadingFlowContext.tsx` | Shared, session-persisted student/book/reading-history state used by `/`, `/reading`, the navbar, and profile-page logout |
+| `src/contexts/readingFlowState.ts` | Pure reducer (unit-tested): login, book selection, progress upsert, clear-history, switch-student |
 | `src/services/bookService.ts` | Loads `/api/books?level=X` and `/media/books.json`; resolves media URLs; provides bundled fallback data |
 | `src/pages/Reading.tsx` | PDF branch (iframe) and chapter branch + assistant sidebar & floating controls |
 | `src/types/index.ts` | Domain types incl. `TranscriptionEvent`, `HelpEvent`, `AssistantStatus` |
@@ -118,3 +122,13 @@ Notes:
 | `src/test/wsUrl.test.ts` | `resolveWsUrl` default/override behaviour and assistant-control readiness by connection status |
 | `src/test/speechReader.test.ts` | Tokenization, boundary mapping, voice ranking, punctuation-aware timing, and elapsed-time catch-up |
 | `src/test/bookService.test.ts` | Media fetch + `pdfUrl` resolution, sample fallback, empty catalogue |
+| `src/test/readingFlowState.test.ts` | Flow reducer: student/book session coupling, history snapshots, upsert, clear-history, switch-student reset |
+
+## Reading history
+
+Reading progress is stored in the shared flow context (persisted in `sessionStorage`), not in
+static fixtures. `Reading.tsx` records each chapter's progress with a book snapshot
+(`bookTitle`, `bookAuthor`, `bookCoverUrl`, `chapterTitle`, `readingLevel`) so the Profile
+page's **History** tab renders real media/API books without consulting bundled sample data.
+Entries upsert per book+chapter, **Clear History** empties the list, and switching or logging
+out a student clears it with the session.

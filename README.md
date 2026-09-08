@@ -37,6 +37,20 @@ credentials required:
    Nginx (SPA + /ws + /media proxy)
 ```
 
+## See it in action
+
+▶ **[Watch the full app flow (MP4)](docs/assets/reading-assistant-flow-demo.mp4)** —
+**Student Login → Book Selection → Reading Session → Profile & Reading History** in one clip.
+
+| Student login | Book selection |
+|---|---|
+| [![Student login](docs/assets/01-student-login.png)](docs/assets/reading-assistant-flow-demo.mp4) | [![Book selection](docs/assets/02-book-selection.png)](docs/assets/reading-assistant-flow-demo.mp4) |
+| **Reading session** | **Profile & reading history** |
+| [![Reading session](docs/assets/03-reading-session.png)](docs/assets/reading-assistant-flow-demo.mp4) | [![Profile history](docs/assets/04-profile-history.png)](docs/assets/reading-assistant-flow-demo.mp4) |
+
+*(Click any screenshot or the link above to play the video — GitHub does not inline
+repo-local MP4 files.)*
+
 ## Quickstart (Docker)
 
 ```bash
@@ -59,6 +73,11 @@ database or API is unavailable.
 The reading route is session-protected and intentionally omitted from the navbar. During an
 active student session, the navbar shows that student's profile and disables the Bookworm home
 link; use **Logout** on the Profile page to clear the session.
+
+Every reading session records progress into the shared flow context, and the Profile page's
+**History** tab renders it with self-contained book snapshots (title, author, chapter, level)
+— no static fixture lookups. **Clear History** wipes it; switching or logging out a student
+clears it automatically.
 
 ### Reading controls
 
