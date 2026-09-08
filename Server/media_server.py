@@ -82,9 +82,9 @@ def _make_handler(storage):
                     )
                     self._respond(200, data, media_type, with_body)
                     return
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — HTTP handler turns *any* error into a 4xx/5xx
                 status = 404 if "Not found" in str(exc) else 500
-                self._respond(status, f"{exc}\n".encode("utf-8"), "text/plain", with_body)
+                self._respond(status, f"{exc}\n".encode(), "text/plain", with_body)
                 return
             self._respond(404, b"not found\n", "text/plain", with_body)
 

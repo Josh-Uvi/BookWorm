@@ -48,7 +48,7 @@ def main() -> int:
             print(f"✔ already present: {target}")
             continue
         print(f"⬇ downloading {url}")
-        urllib.request.urlretrieve(url, target)  # noqa: S310
+        urllib.request.urlretrieve(url, target)
         print(f"✔ saved {target}")
     return 0
 

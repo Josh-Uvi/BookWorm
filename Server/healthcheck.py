@@ -40,7 +40,7 @@ def check_media(settings: Settings) -> bool:
         books = build_storage(settings).read_books_index()
         print(f"{OK} Media library ({settings.storage_provider}): {len(books)} book(s)")
         return True
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — a healthcheck reports *any* backend failure
         print(f"{FAIL} Storage backend ({settings.storage_provider}): {exc}")
         return False
 
@@ -53,7 +53,7 @@ def check_llm_endpoint(settings: Settings) -> bool:
     try:
         with urllib.request.urlopen(url, timeout=5) as response:
             status = response.status
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 — a healthcheck reports *any* endpoint failure
         print(f"{WARN} Could not reach LLM endpoint {url}: {exc}")
         print("       (fine if the server container simply isn't running yet)")
         return False
@@ -106,7 +106,7 @@ def main() -> int:
 
             build_stt(settings)
             print(f"{OK} STT model loaded ({settings.whisper_model})")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — report *any* model-load failure
             print(f"{FAIL} STT model load failed: {exc}")
             healthy = False
 

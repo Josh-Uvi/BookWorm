@@ -56,11 +56,14 @@ async def run(url: str, audio_path: Path, timeout: float) -> int:
                     print(f"← {payload}")
         except (asyncio.TimeoutError, TimeoutError):
             print("… no more messages (timeout reached)")
-        except Exception as exc:  # connection closed by server, etc.
+        except Exception as exc:  # noqa: BLE001 — connection closed by server, etc.
             print(f"… connection closed: {exc}")
 
         print()
-        print("RESULT:", "PASS" if saw_transcription else "FAIL (no transcription)")
+        print(
+            "RESULT:", "PASS" if saw_transcription else "FAIL (no transcription)",
+            f"(help_needed: {'yes' if saw_help else 'no'})",
+        )
         return 0 if saw_transcription else 1
 
 

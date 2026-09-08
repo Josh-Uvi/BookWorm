@@ -1,5 +1,7 @@
 """Shared fixtures: fake AI providers and a test Settings factory."""
 
+from typing import Any
+
 import pytest
 
 from ai.base import Transcript, TranscriptSegment
@@ -51,15 +53,15 @@ class FakeTTS:
 
 
 def make_settings(**overrides) -> Settings:
-    values = dict(
-        host="127.0.0.1",
-        port=0,
-        media_port=0,
-        serve_media=False,
-        stt_flush_interval=0.15,
-        accumulation_window_seconds=0.05,
-        media_dir="media",
-    )
+    values: dict[str, Any] = {
+        "host": "127.0.0.1",
+        "port": 0,
+        "media_port": 0,
+        "serve_media": False,
+        "stt_flush_interval": 0.15,
+        "accumulation_window_seconds": 0.05,
+        "media_dir": "media",
+    }
     values.update(overrides)
     return Settings(**values)
 

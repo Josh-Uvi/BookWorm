@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import json
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # type-only: openai stays a lazy runtime import
+    from openai.types.chat import ChatCompletionUserMessageParam
 
 
 def parse_llm_json(raw: str) -> dict:
@@ -51,18 +55,26 @@ class OllamaLLM:
         )
 
     async def analyze(self, prompt: str) -> dict:
-        payload = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-        }
+        # Explicit keyword arguments keep the heavily-overloaded
+        # completions.create() type-checkable (a **payload dict is not).
+        messages: list[ChatCompletionUserMessageParam] = [
+            {"role": "user", "content": prompt}
+        ]
         try:
             response = await self._client.chat.completions.create(
-                response_format={"type": "json_object"}, **payload
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                response_format={"type": "json_object"},
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 — any endpoint error means retry without response_format
             # Some OpenAI-compatible endpoints reject response_format — retry without it.
-            response = await self._client.chat.completions.create(**payload)
+            response = await self._client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
         content = response.choices[0].message.content or ""
         return parse_llm_json(content)

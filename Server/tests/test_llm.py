@@ -2,11 +2,11 @@
 
 import json
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
 from ai.llm import OllamaLLM, parse_llm_json
-
 
 # ── parse_llm_json ─────────────────────────────────────────────────────
 
@@ -54,7 +54,8 @@ class _FakeOpenAIClient:
 
 def _make_llm(responses) -> OllamaLLM:
     llm = OllamaLLM("http://test/v1", "fake-model", api_key="test")
-    llm._client = _FakeOpenAIClient(responses)
+    # A test double standing in for the SDK client — that's the point.
+    llm._client = cast(Any, _FakeOpenAIClient(responses))
     return llm
 
 

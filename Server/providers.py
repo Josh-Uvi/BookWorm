@@ -5,10 +5,10 @@ register it here. Nothing else in the codebase needs to change.
 """
 from __future__ import annotations
 
-from config import Settings
 from ai.llm import OllamaLLM
 from ai.stt import FasterWhisperSTT
 from ai.tts import EdgeTTS, PiperTTS
+from config import Settings
 from storage import build_storage  # noqa: F401  (re-exported for convenience)
 
 
