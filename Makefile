@@ -8,12 +8,12 @@ COMPOSE_IMPL := $(shell docker compose version >/dev/null 2>&1 && echo "docker c
 COMPOSE ?= $(COMPOSE_IMPL)
 PYTHON ?= python3
 SERVER_PYTHON ?= Server/.venv/bin/python
-OLLAMA_MODEL ?= llama3.2:1b
+OLLAMA_MODEL ?= qwen2.5:3b
 PIPER_VOICE ?= en_US-amy-medium
 
 .DEFAULT_GOAL := help
 .PHONY: help setup setup-venv setup-models up down restart seed logs ps dev-client dev-server \
-	healthcheck test test-server test-client lint lint-server lint-client build prod clean \
+	healthcheck test test-server test-client lint lint-server lint-client typecheck-server build prod clean \
 	deploy-gcp deploy-aws
 
 help: ## Show this help
@@ -111,6 +111,9 @@ lint: lint-server lint-client ## Lint both apps
 
 lint-server: ## Ruff (Python)
 	cd Server && .venv/bin/ruff check .
+
+typecheck-server: ## Mypy (Python types)
+	cd Server && .venv/bin/mypy .
 
 lint-client: ## ESLint (client)
 	cd Client && npm run lint

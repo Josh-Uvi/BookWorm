@@ -16,8 +16,11 @@ services:
       - "8766:8766" # Media HTTP (books.json, PDFs, health)
     env_file: .env
     environment:
-      # Inside the compose network the services talk by name.
-      LLM_BASE_URL: http://ollama:11434/v1
+      # Inside the compose network the services talk by name. Set
+      # LLM_BASE_URL_DOCKER in .env to point the server at a host-native
+      # Ollama instead (e.g. http://host.docker.internal:11434/v1) — useful
+      # when the Docker VM has too little RAM for the configured model.
+      LLM_BASE_URL: ${LLM_BASE_URL_DOCKER:-http://ollama:11434/v1}
       MEDIA_DIR: /data/media
       PIPER_MODELS_DIR: /app/models
     volumes:
