@@ -128,7 +128,7 @@ ai-reading-assistant/
              │  fetch books.json + PDFs                  │    (MinIO / local volume)  │
              ▼                                           └──────────┬─────────────────┘
       Nginx (static dist)                                          ▲
-      /media ← MinIO or volume          Ollama container (llama3.2) ─┘
+      /media ← MinIO or volume          Ollama container (qwen2.5) ─┘
 ```
 
 ### 4.2 Open-source replacement matrix
@@ -136,7 +136,7 @@ ai-reading-assistant/
 | Concern | AWS (today) | Recommended | Alternatives (same interface) |
 |---|---|---|---|
 | Speech-to-Text | Amazon Transcribe | `faster-whisper` (CTranslate2, MIT) + Silero VAD | whisper.cpp, WhisperX, Vosk |
-| LLM analysis | Bedrock Nova Lite | **Ollama** `llama3.2` via OpenAI-compatible API | vLLM, LM Studio, Groq, OpenAI |
+| LLM analysis | Bedrock Nova Lite | **Ollama** `qwen2.5:3b` via OpenAI-compatible API | vLLM, LM Studio, Groq, OpenAI |
 | Text-to-Speech | Amazon Polly (Amy) | **Piper** (`en_US-amy-medium`) | edge-tts (free MS voices), Coqui |
 | Book/PDF storage | CloudFront + S3 | **MinIO** (S3-compatible) or plain volume | any static file server |
 | Realtime transport | raw websockets | **raw websockets** (browser `WebSocket`) | socket.io (later, if rooms needed) |
@@ -290,7 +290,7 @@ as base64. AWS-specific code (boto3 session, region resolution, Transcribe handl
 | `WHISPER_DEVICE` | `cpu` | `cpu` or `cuda` |
 | `LLM_PROVIDER` | `ollama` | any OpenAI-compatible implementation |
 | `LLM_BASE_URL` | `http://ollama:11434/v1` | endpoint (swap = reconfigure only) |
-| `LLM_MODEL` | `llama3.2` | model served at the endpoint |
+| `LLM_MODEL` | `qwen2.5:3b` | model served at the endpoint |
 | `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` | `0.3` / `500` | inference config |
 | `TTS_PROVIDER` | `piper` | `piper` or `edge_tts` |
 | `TTS_VOICE` | `en_US-amy-medium` | Piper voice or edge-tts voice id |
@@ -452,7 +452,7 @@ volumes: { model-cache: {}, ollama: {}, minio: {} }
 
 ### 7.4 First-run model provisioning
 
-`make setup` runs `ollama pull llama3.2` (via a one-shot `docker compose exec`) and downloads
+`make setup` runs `ollama pull qwen2.5:3b` (via a one-shot `docker compose exec`) and downloads
 the Piper voice into the named volume, so subsequent `make up` starts are instant.
 
 ---

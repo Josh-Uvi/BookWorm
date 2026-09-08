@@ -58,7 +58,7 @@ The server needs an OpenAI-compatible LLM endpoint. Pick one:
 - **Ollama sidecar (self-contained)** — bake the lightweight model into a custom image:
   ```dockerfile
   FROM ollama/ollama
-  RUN ollama pull llama3.2:1b
+  RUN ollama pull qwen2.5:3b
   ```
   Deploy it as a second Cloud Run service and point `LLM_BASE_URL` at its internal URL, or run
   it on a GCE VM / GKE for sustained load.

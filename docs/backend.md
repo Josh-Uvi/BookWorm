@@ -76,7 +76,7 @@ container header; the session retains it so buffer rotations stay decodable.
 | `STT_PROVIDER` | `faster_whisper` | STT implementation |
 | `WHISPER_MODEL` / `WHISPER_DEVICE` / `WHISPER_COMPUTE_TYPE` | `base` / `cpu` / `int8` | faster-whisper tuning (`float16` on GPU) |
 | `LLM_PROVIDER` | `ollama` | LLM implementation (any OpenAI-compatible endpoint) |
-| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | `http://localhost:11434/v1` / `ollama` / `llama3.2:1b` | endpoint + model (lightweight 1B default) |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | `http://localhost:11434/v1` / `ollama` / `qwen2.5:3b` | endpoint + model (recommended ~2 GB; ~4 GB RAM to run) |
 | `LLM_TEMPERATURE` / `LLM_MAX_TOKENS` / `LLM_TIMEOUT` | `0.3` / `500` / `30` | inference settings |
 | `TTS_PROVIDER` | `piper` | `piper` (offline, default) or `edge_tts` (online) |
 | `TTS_VOICE` | `en-GB-SoniaNeural` | edge-tts voice id — child-friendly: `en-US-AnaNeural` (child voice), `en-US-JennyNeural` |

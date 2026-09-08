@@ -4,25 +4,36 @@ A platform-agnostic reading companion for children. The child opens a book, read
 and the assistant **listens in real time** — transcribing their speech, noticing when they
 struggle, and speaking a friendly, encouraging help message back.
 
+The assistant has **guardrails against interrupting**: it always knows the passage the child
+is reading (shared by the client), so it can tell *reading aloud* apart from *talking to the
+assistant*. While the child reads the book — even slowly or stumbling — it stays quiet; and
+when the child **asks a question about the story** ("what is a trunk?"), it answers directly
+and simply, grounded in the passage. It answers honestly: "I'm not sure" when it can't know,
+and "that's outside our story" for questions unrelated to the book. When the child says
+**"stop"** (or "shh" / "be quiet"), or says **"thank you"** after an answer — meaning "got it,
+I'm reading again" — the assistant goes silent immediately: no interruptions at all until the
+next direct question, which is answered and lifts the mute. Tunable via
+`READING_MATCH_THRESHOLD`, `HELP_COOLDOWN_SECONDS` and `HELP_MIN_CONFIDENCE`.
+
 Everything runs on **open-source, self-hostable components** — no cloud account or vendor
 credentials required:
 
 | Capability | Default implementation | Swap via |
 |---|---|---|
 | Speech-to-text | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (offline) | `STT_PROVIDER`, `WHISPER_MODEL` |
-| Help analysis (LLM) | [Ollama](https://ollama.com) `llama3.2:1b` — any OpenAI-compatible endpoint (vLLM, LM Studio, Groq, OpenAI…) | `LLM_BASE_URL`, `LLM_MODEL` |
+| Help analysis (LLM) | [Ollama](https://ollama.com) `qwen2.5:3b` — any OpenAI-compatible endpoint (vLLM, LM Studio, Groq, OpenAI…) | `LLM_BASE_URL`, `LLM_MODEL` |
 | Text-to-speech | [Piper](https://github.com/rhasspy/piper) (offline, default) or [edge-tts](https://github.com/rany2/edge_tts) (online fallback) | `TTS_PROVIDER`, `PIPER_VOICE` / `TTS_VOICE` |
 | Book storage | Local folder or [MinIO](https://min.io) (S3-compatible) | `STORAGE_PROVIDER` |
 
 ```
 ┌───────────────────────────┐       ws://…/ws       ┌────────────────────────────┐
 │ Client (React + Vite)     │ ── audio (base64) ──▶ │ Server (Python, asyncio)   │
-│ getUserMedia +            │                       │ faster-whisper STT         │
-│ MediaRecorder             │ ◀── transcript ────── │ Ollama LLM “needs help?”   │
-│ plays spoken help         │ ◀── help + MP3/WAV ── │ Piper / edge-tts TTS       │
-└───────────────────────────┘                       │ books: local / MinIO       │
-        │  loads books.json + PDFs from /media      └────────────────────────────┘
-        ▼
+│ getUserMedia +            │ ── chapter context ─▶ │ faster-whisper STT         │
+│ MediaRecorder            │ ◀── transcript ────── │ guardrails: reading vs.     │
+│ plays spoken help         │ ◀── help + MP3/WAV ── │ asking? + LLM “needs help?”│
+└───────────────────────────┘                       │ Piper / edge-tts TTS       │
+        │  loads books.json + PDFs from /media     │ books: local / MinIO       │
+        ▼                                            └────────────────────────────┘
    Nginx (SPA + /ws + /media proxy)
 ```
 
@@ -37,10 +48,11 @@ Then open **http://localhost:8080**, pick a book, press **“Read aloud”** and
 access. As you read (or pretend to struggle: *“I don’t know this word… help!”*), the live
 transcript appears in the sidebar and the assistant speaks an encouraging reply.
 
-> Heads-up on model size: the default `llama3.2:1b` (~1.3 GB) needs an Ollama container with
-> **≥ 2 GB RAM** and is light enough for most machines. On very constrained hosts (e.g. a
-> default 2 GiB colima VM) use `qwen2.5:0.5b` (~400 MB) — set `LLM_MODEL` and `OLLAMA_MODEL`
-> in `.env`. See [Troubleshooting](#troubleshooting).
+> Heads-up on model size: the default `qwen2.5:3b` (~2 GB weights, ~4 GB RAM to run) is too
+> big for Docker Desktop's default ~2 GB VM — the Ollama container gets OOM-killed. Either
+> raise the VM memory, point the server at a host-native Ollama via `LLM_BASE_URL_DOCKER`
+> (see `.env.example`), or use a lighter model such as `qwen2.5:1.5b` (~1 GB) — set
+> `LLM_MODEL` and `OLLAMA_MODEL` in `.env`. See [Troubleshooting](#troubleshooting).
 
 ## Prerequisites
 
@@ -75,7 +87,7 @@ WHISPER_MODEL=base            # tiny | base | small | medium | large-v3
 
 # Language model — ANY OpenAI-compatible endpoint
 LLM_BASE_URL=http://localhost:11434/v1
-LLM_MODEL=llama3.2:1b         # lightweight 1B default; qwen2.5:0.5b for tiny VMs
+LLM_MODEL=qwen2.5:3b          # recommended; qwen2.5:1.5b for tiny VMs
 
 # Text-to-speech — fully offline (default) or zero-setup online fallback
 TTS_PROVIDER=piper            # or: edge_tts (online; voice set via TTS_VOICE)
@@ -154,7 +166,7 @@ automated via GitHub Actions on `v*` tags (or manual dispatch):
 
 | Symptom | Fix |
 |---|---|
-| LLM errors like `llama-server process terminated: signal killed` | The model doesn't fit in RAM. Give Docker ≥ 2 GB for `llama3.2:1b` (colima: `colima stop && colima start --memory 4 --cpu 4`) or use `LLM_MODEL=qwen2.5:0.5b` (~400 MB). |
+| LLM errors like `llama-server process terminated: signal killed` | The model doesn't fit in RAM: `qwen2.5:3b` needs ~4 GB (the Docker Desktop default VM has ~2 GB). Give Docker more memory (Docker Desktop → Settings → Resources; colima: `colima stop && colima start --memory 4 --cpu 4`), or set `LLM_BASE_URL_DOCKER=http://host.docker.internal:11434/v1` to use a host-native Ollama, or use `LLM_MODEL=qwen2.5:1.5b` (~1 GB). |
 | Piper error “voice not found” | The Docker image bakes the voice in at build time; for **native** dev run `make setup` (downloads the voice to `Server/models`). |
 | `error while creating mount source path … operation not permitted` (macOS) | Docker can't bind-mount `~/Documents` (TCC). The default compose uses named volumes — that's fine. Prefer live host files? Grant Full Disk Access to your VM runtime, or use `docker-compose.bind.yml`. |
 | Microphone button disabled | The page must be served over `http://localhost` or HTTPS; `getUserMedia` is blocked on plain-HTTP LAN IPs. |
