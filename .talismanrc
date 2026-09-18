@@ -12,7 +12,7 @@ fileignoreconfig:
 - filename: Client/src/pages/Interests.tsx
   checksum: 2b5efdaf1716e8ddba2a8d6f985081d59b88d7c33fe7880d82184f7ca0d1204b
 - filename: .github/workflows/deploy-gcp.yml
-  checksum: 70a24d3056f5af4eea454149184f06a7159e32c79d6a6672aee853005d6521e2
+  checksum: 93ffce51899ae7e21201d10c6806678cd9e0aa982f068860fe64179631ad5bda
 - filename: Client/src/pages/Landing.tsx
   checksum: 0e309153c01b539d060deebfdf25e7e79ac497859754ea9ad8efa3ffcc48d135
 - filename: Server/guardrails.py
@@ -68,7 +68,7 @@ fileignoreconfig:
 - filename: Client/src/components/BookSelection.tsx
   checksum: 01c86196d5d9db51be89b6c2d2cefa5b4914523a3d5e33ba8906eec5e8dadb29
 - filename: README.md
-  checksum: f56c1d6dc0b9fa6d5d4a40a545f4268a9c952ec70f2aa32074f658ac8e180e88
+  checksum: 35025939e8600b375bc328dee1e6bc9d249a0ef4365060d8426525ade8bb21f7
 - filename: Client/bun.lockb
   checksum: de0504031b3f5ef43e2151fcdfb4a9d06bf0e8b34c0a68db4fd1a9f0da1382cc
 - filename: docs/assets/reading-assistant-flow-demo.mp4
