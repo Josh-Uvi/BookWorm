@@ -49,8 +49,6 @@ credentials required:
 | **Reading session** | **Profile & reading history** |
 | [![Reading session](docs/assets/03-reading-session.png)](docs/assets/03-reading-session.png) | [![Profile history](docs/assets/04-profile-history.png)](docs/assets/04-profile-history.png) |
 
-*(Click any screenshot or the link above to play the video — GitHub does not inline
-repo-local MP4 files.)*
 
 ## Quickstart (Docker)
 

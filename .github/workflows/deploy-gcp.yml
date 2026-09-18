@@ -4,6 +4,7 @@ name: Deploy to GCP
 # See docs/deployment-gcp.md for the one-time setup (WIF, registry, secrets).
 
 on:
+  # Deploy only on version tags (v*) or manual runs — never on branch pushes.
   push:
     tags: ["v*"]
   workflow_dispatch:
@@ -16,6 +17,11 @@ jobs:
   server:
     name: Server -> Artifact Registry -> Cloud Run
     runs-on: ubuntu-latest
+    # Defense-in-depth: even if the `on:` block is ever widened, only run on
+    # `v*` tag pushes or manual workflow_dispatch.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     steps:
       - uses: actions/checkout@v4
 
@@ -62,6 +68,10 @@ jobs:
   client:
     name: Client -> Cloud Storage (+ Cloud CDN)
     runs-on: ubuntu-latest
+    # Same guard as the `server` job: only run on `v*` tag pushes or manual runs.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     steps:
       - uses: actions/checkout@v4
 
@@ -95,7 +105,11 @@ jobs:
           echo "Client deployed to gs://${{ secrets.GCP_CLIENT_BUCKET }}"
 
       - name: Invalidate Cloud CDN (optional)
-        if: ${{ secrets.GCP_LOAD_BALANCER != '' }}
+        # `secrets` is not allowed in `if:` expressions, so funnel the secret
+        # through an env var and test that instead.
+        if: ${{ env.GCP_LOAD_BALANCER != '' }}
+        env:
+          GCP_LOAD_BALANCER: ${{ secrets.GCP_LOAD_BALANCER }}
         run: |
-          gcloud compute url-maps invalidate-cdn-cache "${{ secrets.GCP_LOAD_BALANCER }}" \
+          gcloud compute url-maps invalidate-cdn-cache "$GCP_LOAD_BALANCER" \
             --path "/*" --async || echo "CDN invalidation skipped (no load balancer configured)"
