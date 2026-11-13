@@ -1,0 +1,225 @@
+# ════════════════════════════════════════════════════════════════════
+# Render Blueprint — AI Reading Assistant (BookWorm) · FULL STACK variant
+# Spec: https://render.com/docs/blueprint-spec · Guide: docs/deployment-render.md
+#
+# This is the self-contained, all-on-Render variant: client nginx image,
+# WebSocket server, media server, MinIO object storage, Redis-backed worker
+# and PostgreSQL. Two services cannot be free (ollama needs ≥ 2 GB RAM and
+# background workers are paid-only) — see the notes below.
+#
+# Looking for the fully-free demo? Use the root `render.yaml` (Netlify SPA +
+# Contentful CMS + a single free Render WebSocket service) instead; this file
+# is the alternative when everything should live inside one platform.
+#
+# Deploy: Render Dashboard → New → Blueprint, then set the Blueprint path to
+# `deploy/render/full-stack.yaml`.
+#
+# Images come from GHCR — build & push them first (docs §3):
+#   ghcr.io/josh-uvi/bookworm-server   docker build ./Server
+#   ghcr.io/josh-uvi/bookworm-client   docker build ./Client
+#   ghcr.io/josh-uvi/bookworm-ollama   docker build deploy/ollama
+#   ghcr.io/josh-uvi/bookworm-worker   docker build -f deploy/worker/Dockerfile .
+#
+# Free-plan topology (docs §0):
+#   free   → client, server-ws, server-media, minio, postgres, redis
+#   paid   → ollama (needs ≥ 2 GB RAM; free = 512 MB), worker (Render workers
+#            are paid-only). Everything that CAN be free, is.
+# ════════════════════════════════════════════════════════════════════
+
+services:
+  # ── Public entry point: SPA + same-origin /ws, /media, /api proxies ──
+  # nginx upstreams are injected at runtime via the ${SERVER_*_UPSTREAM}
+  # template vars (Client/nginx/templates/default.conf.template). Free web
+  # services can't receive private-network traffic, so the server services are
+  # reached over their public https://*.onrender.com URLs.
+  - type: web
+    name: bookworm-client
+    runtime: image
+    plan: free
+    image:
+      url: ghcr.io/josh-uvi/bookworm-client:latest
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: "80" # Render routes public traffic to this port; nginx listens on 80
+      - key: SERVER_WS_UPSTREAM
+        value: https://bookworm-server-ws.onrender.com
+      - key: SERVER_MEDIA_UPSTREAM
+        value: https://bookworm-server-media.onrender.com
+
+  # ── WebSocket / audio pipeline ─────────────────────────────────────
+  # Same server image twice: Render routes public traffic to a single port
+  # (the PORT env var), so WS (8765) and media HTTP (8766) each get a service.
+  # Free instances spin down when idle — the first request pays a cold start.
+  - type: web
+    name: bookworm-server-ws
+    runtime: image
+    plan: free
+    image:
+      url: ghcr.io/josh-uvi/bookworm-server:latest
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8765"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bookworm-postgres
+          property: connectionString
+      - key: LLM_BASE_URL
+        value: https://bookworm-ollama.onrender.com/v1
+      - key: LLM_MODEL
+        value: qwen2.5:1.5b
+      - key: LLM_API_KEY
+        value: ollama
+      - key: STORAGE_PROVIDER
+        value: minio
+      - key: MINIO_ENDPOINT
+        value: bookworm-minio.onrender.com
+      - key: MINIO_SECURE
+        value: "true"
+      - key: MINIO_BUCKET
+        value: books
+      - key: MINIO_ACCESS_KEY
+        fromService:
+          name: bookworm-minio
+          type: web
+          envVarKey: MINIO_ROOT_USER
+      - key: MINIO_SECRET_KEY
+        fromService:
+          name: bookworm-minio
+          type: web
+          envVarKey: MINIO_ROOT_PASSWORD
+
+  # ── Media / library HTTP (books.json, PDFs, /api) ──────────────────
+  # Media-only instance of the same image: SERVE_WS=false skips the WebSocket
+  # bind so MEDIA_PORT is the only listener and PORT can route to it.
+  - type: web
+    name: bookworm-server-media
+    runtime: image
+    plan: free
+    image:
+      url: ghcr.io/josh-uvi/bookworm-server:latest
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8766"
+      - key: MEDIA_PORT
+        value: "8766"
+      - key: SERVE_WS
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bookworm-postgres
+          property: connectionString
+      - key: STORAGE_PROVIDER
+        value: minio
+      - key: MINIO_ENDPOINT
+        value: bookworm-minio.onrender.com
+      - key: MINIO_SECURE
+        value: "true"
+      - key: MINIO_BUCKET
+        value: books
+      - key: MINIO_ACCESS_KEY
+        fromService:
+          name: bookworm-minio
+          type: web
+          envVarKey: MINIO_ROOT_USER
+      - key: MINIO_SECRET_KEY
+        fromService:
+          name: bookworm-minio
+          type: web
+          envVarKey: MINIO_ROOT_PASSWORD
+
+  # ── OpenAI-compatible LLM endpoint (Ollama + lightweight model baked in) ──
+  # NOT free: Render free instances have 512 MB RAM — not enough to load even
+  # a 1 B-parameter model. `standard` (2 GB) is the cheapest plan that runs
+  # qwen2.5:1.5b. The model lives in the image layer (/models), so no disk.
+  # Ollama has no auth — the URL is public by necessity on the free plan.
+  - type: web
+    name: bookworm-ollama
+    runtime: image
+    plan: standard
+    image:
+      url: ghcr.io/josh-uvi/bookworm-ollama:latest
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: "11434" # Render routes public traffic to Ollama's port
+      - key: OLLAMA_HOST
+        value: 0.0.0.0:11434
+      - key: OLLAMA_MODELS
+        value: /models
+
+  # ── S3-compatible object store for books (replaces local /data/media) ──
+  # Public HTTPS endpoint (MINIO_SECURE=true on the server). Free plan has no
+  # persistent disks → book files are ephemeral and must be re-seeded after
+  # each deploy/restart (docs §7).
+  - type: web
+    name: bookworm-minio
+    runtime: image
+    plan: free
+    image:
+      url: minio/minio:latest
+    healthCheckPath: /minio/health/live
+    envVars:
+      - key: PORT
+        value: "9000" # Render routes public traffic to MinIO's API port
+      - key: MINIO_ROOT_USER
+        generateValue: true
+      - key: MINIO_ROOT_PASSWORD
+        generateValue: true
+
+  # ── Background worker: consumes jobs from the Redis queue ─────────
+  # NOT free: background workers are paid-only on Render (`starter` is the
+  # cheapest). Jobs: Server/worker.py — enqueue via LPUSH bookworm:jobs.
+  - type: worker
+    name: bookworm-worker
+    runtime: image
+    plan: starter
+    image:
+      url: ghcr.io/josh-uvi/bookworm-worker:latest
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          name: bookworm-redis
+          type: keyvalue
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bookworm-postgres
+          property: connectionString
+      - key: STORAGE_PROVIDER
+        value: minio
+      - key: MINIO_ENDPOINT
+        value: bookworm-minio.onrender.com
+      - key: MINIO_SECURE
+        value: "true"
+      - key: MINIO_BUCKET
+        value: books
+      - key: MINIO_ACCESS_KEY
+        fromService:
+          name: bookworm-minio
+          type: web
+          envVarKey: MINIO_ROOT_USER
+      - key: MINIO_SECRET_KEY
+        fromService:
+          name: bookworm-minio
+          type: web
+          envVarKey: MINIO_ROOT_PASSWORD
+
+  # ── Redis-compatible queue for the worker ─────────────────────────
+  - type: keyvalue
+    name: bookworm-redis
+    plan: free
+    ipAllowList: [] # internal connections only
+    maxmemoryPolicy: allkeys-lru
+
+# ── Books catalogue (PostgreSQL) ─────────────────────────────────────
+# Free plan: 1 GB storage, expires 30 days after creation (docs §0).
+# The books table is created/seeded by the worker's setup_books job (docs §7)
+# or by a pre-deploy command (`python setup_books_table.py`).
+databases:
+  - name: bookworm-postgres
+    databaseName: reading_assistant
+    plan: free
+

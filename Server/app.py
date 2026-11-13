@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
+from ai.base import LLMClient, STTClient, TTSClient
 from books_repository import PostgresBooksRepository
 from config import Settings
 from guardrails import (
@@ -52,7 +53,13 @@ def _optional_string(value) -> str | None:
 class ReadingAssistantServer:
     """Owns the provider instances and orchestrates per-client sessions."""
 
-    def __init__(self, settings: Settings, stt=None, llm=None, tts=None):
+    def __init__(
+        self,
+        settings: Settings,
+        stt: STTClient | None = None,
+        llm: LLMClient | None = None,
+        tts: TTSClient | None = None,
+    ):
         # Providers are injectable, which keeps tests fast and dependency-free.
         self.settings = settings
         self.stt = stt or build_stt(settings)
@@ -463,6 +470,15 @@ class ReadingAssistantServer:
             )
             media.start()
             logger.info("Media server listening on http://%s:%s", settings.host, media.port)
+
+        if not settings.serve_ws:
+            # Media-only mode: for platforms that route public traffic to a single
+            # port (e.g. Render splits the image across a WS and a media service),
+            # SERVE_WS=false skips the WebSocket bind so MEDIA_PORT is the only
+            # listener and can be exposed via PORT.
+            logger.info("WebSocket server disabled (SERVE_WS=false) — media-only mode")
+            await asyncio.Future()  # run forever
+            return
 
         async with serve(
             self.handle_connection,

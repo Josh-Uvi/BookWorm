@@ -54,6 +54,12 @@ class MediaServer:
         )
         self._thread.start()
 
+    def shutdown(self, timeout: float | None = None) -> None:
+        """Stop the HTTP server and wait for its thread to finish."""
+        self._httpd.shutdown()
+        if self._thread is not None:
+            self._thread.join(timeout)
+
     @property
     def port(self) -> int:
         return self._httpd.server_address[1]

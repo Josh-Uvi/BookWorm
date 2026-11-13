@@ -13,6 +13,7 @@ import asyncio
 import io
 import wave
 from pathlib import Path
+from typing import Any, cast
 
 
 class EdgeTTS:
@@ -25,8 +26,10 @@ class EdgeTTS:
         communicate = edge_tts.Communicate(text, self.voice)
         buffer = bytearray()
         async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                buffer.extend(chunk["data"])
+            if chunk.get("type") == "audio":
+                data = chunk.get("data")
+                if data is not None:
+                    buffer.extend(data)
         if not buffer:
             raise RuntimeError(f"edge-tts produced no audio for voice {self.voice!r}")
         return bytes(buffer), "mp3"
@@ -67,6 +70,6 @@ class PiperTTS:
                 self._voice.synthesize_wav(text, wav_file)
             else:  # piper-tts < 1.3
                 # Old piper took the wav file as argument 2; the modern stubs
-                # describe only the >= 1.3 signature, so silence the checker.
-                self._voice.synthesize(text, wav_file)  # type: ignore[arg-type]
+                # describe only the >= 1.3 signature.
+                cast(Any, self._voice).synthesize(text, wav_file)
         return buffer.getvalue()

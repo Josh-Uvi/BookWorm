@@ -1,16 +1,29 @@
 import { Book } from "@/types";
 import { sampleBooks } from "@/data/sampleBooks";
 import { getReadingLevelBooks, readingLevelBooks } from "@/data/readingBooks";
+import {
+  fetchContentfulBooks,
+  fetchContentfulBooksByLevel,
+  isContentfulConfigured,
+} from "@/services/contentfulService";
 
 /**
- * Books are served by the platform-agnostic media server (`/media`
- * prefix — see Server/media_server.py, vite.config.ts and nginx.conf).
- * If it is unreachable we gracefully fall back to the bundled samples.
+ * Catalogue resolution order — first source that answers wins:
+ *   1. Contentful CMS (`VITE_CONTENTFUL_*`) — free demo, see docs/deployment-render.md
+ *   2. `/api/books`   — platform server: media index → PostgreSQL → mock
+ *   3. `/media/books.json` — platform media server catalogue
+ *   4. bundled samples — offline-safe fallback
+ *
+ * Platform sources are served by the media server (`/media` prefix — see
+ * Server/media_server.py, vite.config.ts and nginx.conf).
  */
 const MEDIA_URL = (import.meta.env.VITE_MEDIA_URL || "/media").replace(/\/+$/, "");
 const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/+$/, "");
 
+/** Absolute (or protocol-relative) URLs — e.g. Contentful assets — pass through. */
 function resolveMediaUrl(relativePath: string): string {
+  if (/^[a-z][a-z\d+.-]*:\/\//i.test(relativePath)) return relativePath;
+  if (relativePath.startsWith("//")) return `https:${relativePath}`;
   return `${MEDIA_URL}/${relativePath.replace(/^\/+/, "")}`;
 }
 
@@ -42,7 +55,7 @@ interface BooksApiResponse {
 export interface LevelBooksResult {
   books: Book[];
   fellBack: boolean;
-  source: "postgres" | "media" | "mock" | "bundled";
+  source: "contentful" | "postgres" | "media" | "mock" | "bundled";
 }
 
 function normalizeFallbackBook(book: Book): Book {
@@ -98,6 +111,14 @@ async function fetchMediaBooksByLevel(level: 2 | 3): Promise<Book[]> {
 }
 
 export const fetchBooks = async (): Promise<Book[]> => {
+  if (isContentfulConfigured()) {
+    try {
+      const books = await fetchContentfulBooks();
+      if (books.length > 0) return books;
+    } catch {
+      // CMS unreachable — fall through to the platform media server.
+    }
+  }
   try {
     const books = await fetchMediaBooks();
     return books.length > 0 ? books : sampleBooks;
@@ -107,6 +128,17 @@ export const fetchBooks = async (): Promise<Book[]> => {
 };
 
 export async function fetchBooksByLevel(level: 2 | 3): Promise<LevelBooksResult> {
+  if (isContentfulConfigured()) {
+    try {
+      const books = await fetchContentfulBooksByLevel(level);
+      if (books.length > 0) {
+        return { books, fellBack: false, source: "contentful" };
+      }
+    } catch {
+      // CMS unreachable — fall through to the platform API chain below.
+    }
+  }
+
   let apiMockBooks: Book[] = [];
   try {
     const response = await fetch(`${API_URL}/books?level=${level}`);
@@ -193,6 +225,18 @@ function pickSampleBook(bookId: string): Book {
  * caller to notify the user.
  */
 export async function fetchReadableBook(bookId: string): Promise<ResolvedBook> {
+  if (isContentfulConfigured()) {
+    try {
+      const book = (await fetchContentfulBooks()).find((candidate) => candidate.id === bookId);
+      if (book) {
+        // CMS assets are trusted absolute URLs; cross-origin HEAD probes are
+        // unreliable (and unnecessary) for them, so skip isPdfAvailable here.
+        return { book, fellBack: false };
+      }
+    } catch {
+      // CMS unreachable — fall through to the media catalogue below.
+    }
+  }
   try {
     const books = await fetchMediaBooks();
     const book = books.find((candidate) => candidate.id === bookId);

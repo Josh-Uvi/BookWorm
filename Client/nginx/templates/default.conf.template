@@ -1,0 +1,55 @@
+# AI Reading Assistant — Nginx config (SPA + WebSocket + media proxy).
+#
+# Upstream hosts are injected at container start: this file ships as an nginx
+# *template* (Client/nginx/templates/default.conf.template) and the official
+# nginx entrypoint runs envsubst over it. Only ${SERVER_*} variables defined in
+# the environment are substituted — nginx runtime vars ($host, $uri, ...) are
+# untouched. Set them per environment:
+#   docker compose: SERVER_WS_UPSTREAM=http://server:8765
+#                   SERVER_MEDIA_UPSTREAM=http://server:8766
+#   Render (free plan): SERVER_WS_UPSTREAM=https://<server-ws>.onrender.com
+#                       SERVER_MEDIA_UPSTREAM=https://<server-media>.onrender.com
+# proxy_ssl_server_name on is required for HTTPS upstreams that serve certs per
+# SNI (e.g. onrender.com) and is harmless for plain HTTP.
+
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA routing — everything unknown falls back to index.html.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # WebSocket traffic → Python server (same-origin /ws for the browser).
+    location /ws {
+        proxy_pass ${SERVER_WS_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_ssl_server_name on;
+    }
+
+    # Media library (books.json + PDFs) → Python media server.
+    location /media/ {
+        proxy_pass ${SERVER_MEDIA_UPSTREAM}/;
+        proxy_set_header Host $host;
+        proxy_ssl_server_name on;
+    }
+
+    # Reading-level catalogue API → Python HTTP server.
+    location /api/ {
+        proxy_pass ${SERVER_MEDIA_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_ssl_server_name on;
+    }
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+}

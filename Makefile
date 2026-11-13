@@ -14,7 +14,7 @@ PIPER_VOICE ?= en_US-amy-medium
 .DEFAULT_GOAL := help
 .PHONY: help setup setup-venv setup-models setup-books up down restart seed logs ps dev-client dev-server \
 	healthcheck test test-server test-client lint lint-server lint-client typecheck-server build prod clean \
-	deploy-gcp deploy-aws
+	deploy-gcp deploy-aws deploy-netlify
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -136,3 +136,9 @@ deploy-aws: ## Deploy to AWS (GitHub Actions — see docs/deployment-aws.md)
 	@echo "→ Triggering GitHub Actions deploy-aws workflow (requires the gh CLI)."
 	@command -v gh >/dev/null 2>&1 && gh workflow run deploy-aws.yml --ref main \
 		|| echo "⚠️  gh CLI not available — push a v* tag or run the workflow from GitHub."
+
+deploy-netlify: ## Build + publish the SPA to Netlify (free demo — see docs/deployment-render.md)
+	@echo "→ Building Client/ and publishing to Netlify (netlify.toml supplies base/publish)."
+	@cd Client && npm ci && npm run build
+	@cd Client && npx --yes netlify-cli deploy --dir=dist --prod \
+		|| echo "⚠️  netlify-cli failed — set NETLIFY_AUTH_TOKEN / link the site once with 'netlify link'."
