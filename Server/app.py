@@ -16,7 +16,7 @@ import contextlib
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
@@ -42,7 +42,7 @@ logger = logging.getLogger("reading-assistant")
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _optional_string(value) -> str | None:
