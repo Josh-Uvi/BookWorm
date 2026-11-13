@@ -367,11 +367,12 @@ describe("fetchBooksByLevel", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.includes("cdn.contentful.com")) {
+        const rawUrl = String(input);
+        const parsed = new URL(rawUrl, "http://localhost");
+        if (parsed.hostname === "cdn.contentful.com") {
           return { ok: false, status: 500, json: async () => ({}) };
         }
-        if (url.startsWith("/api/books")) {
+        if (rawUrl.startsWith("/api/books")) {
           return {
             ok: true,
             json: async () => ({
@@ -394,7 +395,7 @@ describe("fetchBooksByLevel", () => {
             }),
           };
         }
-        throw new Error(`Unexpected request: ${url}`);
+        throw new Error(`Unexpected request: ${rawUrl}`);
       })
     );
 
