@@ -40,8 +40,7 @@ def test_books_route_serves_files_from_the_books_folder(tmp_path):
             assert response.status == 200
             assert response.read() == b"%PDF-1.4 fake-book"
     finally:
-        server._httpd.shutdown()
-        server._thread.join(timeout=5)
+        server.shutdown(timeout=5)
 
 
 def test_books_json_is_served(tmp_path):
@@ -53,8 +52,7 @@ def test_books_json_is_served(tmp_path):
                 {"id": "1", "title": "Sample", "pdfUrl": "books/sample.pdf"}
             ]
     finally:
-        server._httpd.shutdown()
-        server._thread.join(timeout=5)
+        server.shutdown(timeout=5)
 
 
 def test_missing_book_returns_404(tmp_path):
@@ -67,8 +65,7 @@ def test_missing_book_returns_404(tmp_path):
         except urllib.error.HTTPError as exc:
             assert exc.code == 404
     finally:
-        server._httpd.shutdown()
-        server._thread.join(timeout=5)
+        server.shutdown(timeout=5)
 
 
 @dataclass
@@ -102,8 +99,7 @@ def test_books_api_filters_by_level_and_sets_cors(tmp_path):
                 "source": "postgres",
             }
     finally:
-        server._httpd.shutdown()
-        server._thread.join(timeout=5)
+        server.shutdown(timeout=5)
 
 
 def test_books_api_prefers_real_media_books_over_database_rows(tmp_path):
@@ -140,8 +136,7 @@ def test_books_api_prefers_real_media_books_over_database_rows(tmp_path):
             assert payload["books"][0]["book_id"] == "media-book"
             assert payload["books"][0]["pdf_url"] == "books/sample.pdf"
     finally:
-        server._httpd.shutdown()
-        server._thread.join(timeout=5)
+        server.shutdown(timeout=5)
 
 
 def test_books_api_uses_mock_data_when_database_fails(tmp_path):
@@ -156,8 +151,7 @@ def test_books_api_uses_mock_data_when_database_fails(tmp_path):
             assert payload["source"] == "mock"
             assert all(book["level"] == 3 for book in payload["books"])
     finally:
-        server._httpd.shutdown()
-        server._thread.join(timeout=5)
+        server.shutdown(timeout=5)
 
 
 def test_books_api_rejects_invalid_levels(tmp_path):
@@ -171,5 +165,4 @@ def test_books_api_rejects_invalid_levels(tmp_path):
                 assert exc.code == 400
                 assert json.loads(exc.read())["error"]
     finally:
-        server._httpd.shutdown()
-        server._thread.join(timeout=5)
+        server.shutdown(timeout=5)

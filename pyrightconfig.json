@@ -1,0 +1,8 @@
+{
+  "include": ["Server"],
+  "venvPath": "Server",
+"venv": ".venv",
+"extraPaths": [
+    "./Server"
+]
+}

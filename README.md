@@ -1,5 +1,4 @@
-> **Disclaimer:** The idea for this project originated at an AWS hackathon. However, this repository uses no code or other input from the hackathon. The implementation, design, and all other aspects of this codebase are entirely my own.
-
+> **Disclaimer:** The idea for this project originated at an AWS hackathon. However, no code or other input from the hackathon was used in this repository. The implementation, design, and all other aspects of this codebase are entirely my own independent work. 
 # AI Reading Companion
 
 AI reading companion for children. This platform-agnostic reading app lets users open a book and read aloud while the assistant **listens in real time**—transcribing their speech, detecting when they struggle, and responding with a friendly, encouraging message or answering context-related questions.
@@ -38,6 +37,11 @@ credentials required:
         ▼                                            └────────────────────────────┘
    Nginx (SPA + /ws + /media proxy)
 ```
+
+## Architecture
+
+See [docs/architecture.md](docs/architecture.md) for the full design — the
+logical system, data model (ERD), and every deployment topology.
 
 ## See it in action
 
@@ -120,6 +124,7 @@ clears it automatically.
 | `make lint` | ruff (server) + eslint (client) |
 | `make healthcheck` | Verify media library, LLM endpoint and TTS voice |
 | `make deploy-gcp` / `make deploy-aws` | Trigger the GitHub Actions deployments |
+| `make deploy-netlify` | Build and publish the SPA to Netlify (free demo) |
 | `make help` | List everything |
 
 ## Configuration
@@ -152,6 +157,13 @@ Book PDFs live in `media/books/` and are described by `media/books.json` (each e
 is relative to the media root). PDFs are git-ignored — commit only `books.json`. With the stack
 running, `make up` / `make seed` copies them into the media volume automatically.
 
+The catalogue can come from three places, tried in this order by
+`Client/src/services/bookService.ts`: **Contentful** (when `VITE_CONTENTFUL_*` is set — see
+[docs/deployment-render.md](docs/deployment-render.md) for the content-model table) →
+**`/api/books?level=2|3`** (media index → PostgreSQL → built-in mock) → **`/media/books.json`**
+→ bundled sample books. In the database-backed path, seed the table with
+`make setup-books` (or the worker's `setup_books` job).
+
 ## Project layout
 
 ```
@@ -159,23 +171,31 @@ running, `make up` / `make seed` copies them into the media volume automatically
 ├── Client/               # React 18 + Vite + TS + Tailwind + shadcn/ui
 │   ├── src/hooks/        #   useAudioRecorder, useReadingAssistant, useSpeechReader
 │   ├── src/components/   #   HighlightedText + shared UI components
+│   ├── src/contexts/     #   ReadingFlowContext + readingFlowState reducer
 │   ├── src/pages/        #   Landing, Interests, Reading, Profile
-│   ├── src/services/     #   bookService, wsMessages
-│   ├── Dockerfile        #   node build → nginx (proxies /ws, /media)
-│   └── nginx.conf
+│   ├── src/services/     #   bookService, contentfulService, wsMessages
+│   ├── src/test/         #   vitest suites (state, services, WS parsing)
+│   ├── Dockerfile        #   node build → nginx (proxies /ws, /media, /api)
+│   └── nginx/templates/  #   default.conf.template (SERVER_*_UPSTREAM envsubst)
 ├── Server/               # Python 3.11, asyncio
 │   ├── app.py            #   WebSocket orchestrator (+ /health)
 │   ├── ai/               #   provider interfaces: stt.py, llm.py, tts.py
 │   ├── providers.py      #   factory wired from env vars
 │   ├── session.py        #   audio buffer, transcript dedup, analysis window
-│   ├── media_server.py   #   stdlib HTTP: /books.json, /books/*
+│   ├── guardrails.py     #   reading-vs-asking, mute/cooldown, intent
+│   ├── media_server.py   #   stdlib HTTP: /health, /api/books, /books.json, /books/*
+│   ├── books_repository.py / setup_books_table.py   # PostgreSQL catalogue
 │   ├── storage.py        #   local | minio
+│   ├── worker.py         #   Redis-queue background worker
 │   ├── scripts/          #   download_piper_voice.py, e2e_smoke.py
-│   ├── tests/            #   15 tests incl. E2E WS pipeline
+│   ├── tests/            #   pytest incl. E2E WS pipeline
 │   └── Dockerfile
 ├── media/                # books.json + books/ (PDFs)
-├── docs/                 # backend, frontend, deployment guides
+├── docs/                 # backend, frontend, cloud + Render/Netlify guides
+├── deploy/               # aws/ecs-task-definition.json, ollama/, worker/, render/
 ├── docker-compose*.yml   # dev / prod / gpu / bind-mount variants
+├── render.yaml           # Render Blueprint — free demo (Netlify + Contentful)
+├── netlify.toml          # Netlify static hosting for the SPA
 ├── Makefile
 └── .github/workflows/    # CI + GCP/AWS deploys
 ```
@@ -209,6 +229,10 @@ automated via GitHub Actions on `v*` tags (or manual dispatch):
   [docs/deployment-gcp.md](docs/deployment-gcp.md)
 - **AWS** — server → ECS Fargate behind an ALB, client → S3 + CloudFront:
   [docs/deployment-aws.md](docs/deployment-aws.md)
+- **Free demo (split across platforms)** — SPA → Netlify, WebSocket server → Render free plan,
+  book catalogue/PDFs → Contentful, LLM → any OpenAI-compatible API:
+  [docs/deployment-render.md](docs/deployment-render.md) (`render.yaml` at the repo root;
+  the all-on-Render variant is `deploy/render/full-stack.yaml`)
 
 ## Troubleshooting
 

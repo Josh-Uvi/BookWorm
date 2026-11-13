@@ -1,0 +1,102 @@
+# ════════════════════════════════════════════════════════════════════
+# Render Blueprint — AI Reading Assistant · FREE DEMO (single service)
+# Spec: https://render.com/docs/blueprint-spec · Guide: docs/deployment-render.md
+#
+# Split free-tier topology this Blueprint belongs to:
+#   SPA + assets    → Netlify      (netlify.toml, free)
+#   Book catalogue  → Contentful   (free; client-side, see docs §5)
+#   Audio pipeline  → Render       (this file, free)
+#   LLM             → any OpenAI-compatible API (hosted free tier, or the
+#                     optional Ollama service below)
+#
+# Deploy: Render Dashboard → New → Blueprint → select this repo
+#         (Render reads this root render.yaml).
+#
+# Image: build once and push to GHCR (docs §3):
+#   docker build -t ghcr.io/josh-uvi/bookworm-server:latest ./Server && docker push ...
+#
+# Why one service is enough: books/PDFs come from Contentful, so the media
+# server, PostgreSQL and object storage are switched off here (SERVE_MEDIA=false
+# means app.py never builds a storage backend). The WebSocket pipeline
+# (STT → LLM → TTS) is the only stateful piece, and it keeps audio in memory.
+#
+# Full self-contained variant (client + media + MinIO + Redis worker + Postgres,
+# two paid services): deploy/render/full-stack.yaml
+# ════════════════════════════════════════════════════════════════════
+
+services:
+  # ── WebSocket / audio pipeline (free: 512 MB RAM, 0.1 CPU) ─────────
+  # Free instances spin down after ~15 min idle: the next microphone session
+  # pays a ~30–60 s cold start (container + whisper model load). The browser
+  # client already reconnects with exponential backoff.
+  - type: web
+    name: bookworm-server
+    runtime: image
+    plan: free
+    region: oregon
+    image:
+      url: ghcr.io/josh-uvi/bookworm-server:latest
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8765" # Render routes public traffic (incl. WebSockets) here
+      # Content is served by Contentful on the client — no media server,
+      # no PostgreSQL, no object storage in the demo.
+      - key: SERVE_MEDIA
+        value: "false"
+
+      # ── Speech-to-text (in-container, offline) ──────────────────────
+      # `tiny` is the only whisper size that fits the free 512 MB instance.
+      - key: STT_PROVIDER
+        value: faster_whisper
+      - key: WHISPER_MODEL
+        value: tiny
+      - key: WHISPER_COMPUTE_TYPE
+        value: int8
+
+      # ── Text-to-speech ─────────────────────────────────────────────
+      # piper is baked into the image (offline, no extra RAM-heavy service).
+      # If the free instance OOMs under load, switch to: TTS_PROVIDER=edge_tts
+      - key: TTS_PROVIDER
+        value: piper
+      - key: PIPER_VOICE
+        value: en_US-amy-medium
+
+      # ── Language model ─────────────────────────────────────────────
+      # Default: a hosted OpenAI-compatible endpoint (swap freely — Groq,
+      # OpenAI, vLLM, …). Set the key in the dashboard (`sync: false`).
+      - key: LLM_PROVIDER
+        value: openai
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_MODEL
+        value: llama-3.1-8b-instant
+      - key: LLM_API_KEY
+        sync: false
+      # Self-hosting instead? Uncomment the bookworm-ollama service below and
+      # use: LLM_BASE_URL=https://bookworm-ollama.onrender.com/v1
+      #      LLM_MODEL=qwen2.5:1.5b  LLM_API_KEY=ollama
+
+      # Guardrails/behaviour knobs left at their .env.example defaults
+      # (ACCUMULATION_WINDOW_SECONDS, HELP_COOLDOWN_SECONDS, …).
+
+  # ── OPTIONAL: self-hosted LLM endpoint (NOT free) ───────────────────
+  # Ollama with a lightweight model baked into the image; needs ≥ 2 GB RAM,
+  # so it cannot run on a 512 MB free instance. Costs more than most hosted
+  # OpenAI-compatible APIs — keep it commented unless you want everything
+  # self-contained.
+  #
+  # - type: web
+  #   name: bookworm-ollama
+  #   runtime: image
+  #   plan: standard
+  #   image:
+  #     url: ghcr.io/josh-uvi/bookworm-ollama:latest
+  #   healthCheckPath: /
+  #   envVars:
+  #     - key: PORT
+  #       value: "11434"
+  #     - key: OLLAMA_HOST
+  #       value: 0.0.0.0:11434
+  #     - key: OLLAMA_MODELS
+  #       value: /models

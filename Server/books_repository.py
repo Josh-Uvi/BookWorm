@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    import psycopg
+    from psycopg.rows import DictRow
 
 CREATE_BOOKS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS books (
@@ -51,13 +55,18 @@ class PostgresBooksRepository:
             raise ValueError("DATABASE_URL is required for PostgreSQL book storage")
         self.database_url = database_url
 
-    def _connect(self):
+    def _connect(self) -> psycopg.Connection[DictRow]:
         try:
             import psycopg
             from psycopg.rows import dict_row
         except ImportError as exc:  # pragma: no cover - exercised by development fallback
             raise RuntimeError("Install psycopg[binary] to use PostgreSQL book storage") from exc
-        return psycopg.connect(self.database_url, connect_timeout=3, row_factory=dict_row)
+        # psycopg's py.typed stubs type `connect()` for tuple rows only, so pin
+        # the dict-row factory/result at this boundary and keep it typed beyond.
+        connection: Any = psycopg.connect(
+            self.database_url, connect_timeout=3, row_factory=cast(Any, dict_row)
+        )
+        return connection
 
     def setup(self, books: Iterable[dict[str, Any]]) -> int:
         with self._connect() as connection, connection.cursor() as cursor:

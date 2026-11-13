@@ -42,6 +42,12 @@ services:
         VITE_WS_URL: ${VITE_WS_URL:-}
         VITE_MEDIA_URL: ${VITE_MEDIA_URL:-/media}
         VITE_API_URL: ${VITE_API_URL:-/api}
+    environment:
+      # Rendered into nginx.conf at container start (see
+      # Client/nginx/templates/default.conf.template). Compose service names
+      # are the defaults; Render's blueprint overrides them at runtime.
+      SERVER_WS_UPSTREAM: http://server:8765
+      SERVER_MEDIA_UPSTREAM: http://server:8766
     ports:
       - "8080:80"
     depends_on:

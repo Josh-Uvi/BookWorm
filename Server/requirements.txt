@@ -16,3 +16,6 @@ piper-tts>=1.2         # fully offline (download voices via scripts/download_pip
 
 # Optional S3-compatible storage backend (STORAGE_PROVIDER=minio)
 minio>=7.2
+
+# Background worker queue (Server/worker.py; Render Key Value on Render)
+redis>=5,<7

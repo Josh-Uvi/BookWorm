@@ -1,10 +1,44 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchBook, fetchBooks, fetchBooksByLevel, fetchReadableBook } from "@/services/bookService";
+import { clearContentfulCache } from "@/services/contentfulService";
 import { sampleBooks } from "@/data/sampleBooks";
+
+/** Minimal Contentful CDA payload for one level-2 book with a PDF asset. */
+const contentfulPayload = {
+  items: [
+    {
+      sys: { id: "entry-1" },
+      fields: {
+        bookId: "book_2_1",
+        title: "CMS Book",
+        author: "CMS Author",
+        description: "From the CMS.",
+        genre: "Picture Book",
+        level: 2,
+        pages: 20,
+        publishedYear: 2001,
+        sampleText: "A CMS practice passage.",
+        pdf: {
+          fields: {
+            title: "pdf",
+            file: { url: "//images.ctfassets.net/space123/asset/cms-book.pdf" },
+          },
+        },
+      },
+    },
+  ],
+};
+
+function stubContentfulEnv() {
+  vi.stubEnv("VITE_CONTENTFUL_SPACE_ID", "space123");
+  vi.stubEnv("VITE_CONTENTFUL_ACCESS_TOKEN", "delivery-token");
+}
 
 describe("bookService", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    clearContentfulCache();
   });
 
   it("falls back to sample books when the media server is unreachable", async () => {
@@ -37,6 +71,75 @@ describe("bookService", () => {
     expect(books[0].pdfUrl).toBe("/media/books/media-book.pdf");
   });
 
+  it("passes absolute pdfUrls (e.g. CMS assets) through untouched", async () => {
+    const mediaBooks = [
+      {
+        id: "11",
+        title: "Absolute Book",
+        author: "Author",
+        coverUrl: "https://example.com/cover.jpg",
+        description: "desc",
+        genre: "Children's Fiction",
+        pdfUrl: "https://images.ctfassets.net/space123/asset/absolute.pdf",
+        chapters: [],
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => mediaBooks })
+    );
+
+    const books = await fetchBooks();
+    expect(books[0].pdfUrl).toBe("https://images.ctfassets.net/space123/asset/absolute.pdf");
+  });
+
+  it("prefers the Contentful catalogue when it is configured", async () => {
+    stubContentfulEnv();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => contentfulPayload,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const books = await fetchBooks();
+
+    expect(books).toHaveLength(1);
+    expect(books[0]).toMatchObject({
+      id: "book_2_1",
+      title: "CMS Book",
+      pdfUrl: "https://images.ctfassets.net/space123/asset/cms-book.pdf",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // the media catalogue is not queried
+  });
+
+  it("falls back to the media catalogue when the CMS request fails", async () => {
+    stubContentfulEnv();
+    const mediaBooks = [
+      {
+        id: "10",
+        title: "Media Book",
+        author: "Author",
+        coverUrl: "https://example.com/cover.jpg",
+        description: "desc",
+        genre: "Children's Fiction",
+        pdfUrl: "books/media-book.pdf",
+        chapters: [],
+      },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const requestUrl = input instanceof URL ? input : new URL(String(input), "http://localhost");
+        return requestUrl.hostname === "cdn.contentful.com"
+          ? { ok: false, status: 503, json: async () => ({}) }
+          : { ok: true, json: async () => mediaBooks };
+      })
+    );
+
+    const books = await fetchBooks();
+    expect(books[0]).toMatchObject({ id: "10", pdfUrl: "/media/books/media-book.pdf" });
+  });
+
   it("falls back when the media catalogue is empty", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
 
@@ -53,6 +156,8 @@ describe("bookService", () => {
 describe("fetchBooksByLevel", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    clearContentfulCache();
   });
 
   it("normalizes the PostgreSQL API response", async () => {
@@ -240,11 +345,71 @@ describe("fetchBooksByLevel", () => {
     expect(result.books).toHaveLength(5);
     expect(result.books.every((book) => book.level === 3)).toBe(true);
   });
+
+  it("returns CMS books first when Contentful is configured", async () => {
+    stubContentfulEnv();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => contentfulPayload,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchBooksByLevel(2);
+
+    expect(result.source).toBe("contentful");
+    expect(result.fellBack).toBe(false);
+    expect(result.books[0].title).toBe("CMS Book");
+    expect(fetchMock).toHaveBeenCalledTimes(1); // no /api or /media fallbacks needed
+  });
+
+  it("falls through to the API chain when the CMS fails", async () => {
+    stubContentfulEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const rawUrl = String(input);
+        const parsed = new URL(rawUrl, "http://localhost");
+        if (parsed.hostname === "cdn.contentful.com") {
+          return { ok: false, status: 500, json: async () => ({}) };
+        }
+        if (rawUrl.startsWith("/api/books")) {
+          return {
+            ok: true,
+            json: async () => ({
+              level: 2,
+              count: 1,
+              source: "postgres",
+              books: [{
+                book_id: "db-book",
+                name: "Database Book",
+                level: 2,
+                description: "desc",
+                author: "Author",
+                pages: 10,
+                genre: "Picture Book",
+                published_year: 1999,
+                pdf_url: "",
+                cover_url: "",
+                sample_text: "Passage.",
+              }],
+            }),
+          };
+        }
+        throw new Error(`Unexpected request: ${rawUrl}`);
+      })
+    );
+
+    const result = await fetchBooksByLevel(2);
+    expect(result.source).toBe("postgres");
+    expect(result.books[0].title).toBe("Database Book");
+  });
 });
 
 describe("fetchReadableBook", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    clearContentfulCache();
   });
 
   const mediaBook = {
@@ -305,5 +470,22 @@ describe("fetchReadableBook", () => {
     const { book, fellBack } = await fetchReadableBook("1");
     expect(fellBack).toBe(true);
     expect(book).toEqual(sampleBooks[0]);
+  });
+
+  it("serves a CMS book without probing the asset (absolute URL, trusted)", async () => {
+    stubContentfulEnv();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => contentfulPayload,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { book, fellBack } = await fetchReadableBook("book_2_1");
+
+    expect(fellBack).toBe(false);
+    expect(book.title).toBe("CMS Book");
+    expect(book.pdfUrl).toBe("https://images.ctfassets.net/space123/asset/cms-book.pdf");
+    // Only the CDA call happened — no HEAD probe for absolute CMS assets.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

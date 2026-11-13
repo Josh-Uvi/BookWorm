@@ -1,12 +1,12 @@
 fileignoreconfig:
 - filename: .env.example
-  checksum: ab71f877db9031d42593073d1c60207fe1f05188511a14f5c540f01e4ff73f9d
+  checksum: 8eeaf79685273d1ce3f89e0149f90647711d13cccb6a26c9c517ff921cce35e8
 - filename: Client/.env.example
   checksum: ca459f85087cd0f2b5bd57638a6258fff36bfe02c1b2d49b6aed502abd6f5fd7
 - filename: Client/src/vite-env.d.ts
   checksum: 3eb6748d07a68f7a63880314cc4cfb59510e5bbf28ec7a0e3dd2c841af92d033
 - filename: Client/package-lock.json
-  checksum: cfaf8787fb33696d6134f4ac49308aa398faa65d51f97ef85cc201ac2d983e67
+  checksum: 8725fdd44a09eac353e15adc05108d06971bb5411d99a9007a7df4114b558e98
 - filename: .github/workflows/deploy-aws.yml
   checksum: 5de5747a589116b3468beffbe85344eef90eb780bafe179a27f3616e8b41ee80
 - filename: Client/src/pages/Interests.tsx
@@ -30,7 +30,7 @@ fileignoreconfig:
 - filename: Client/src/pages/Profile.tsx
   checksum: 908dd633ffd2800a47824ed4cd3932ecaacb209431538b5f529e45b7d247e3de
 - filename: docs/backend.md
-  checksum: 4cfe805c0b2aa3dc90511131361fae0520a2f43e261baaaed1442157efe6a82b
+  checksum: df574f7b44712e86bd58d32bfe9192fd2015c6f1c512a2873e1132619f5bbb10
 - filename: Client/src/data/sampleBooks.ts
   checksum: 913f7b4846ffd39cb1f0ccc1477f743e0ed1d227a3d91ba3f87b9c010ff207db
 - filename: Client/src/components/ui/carousel.tsx
@@ -56,19 +56,19 @@ fileignoreconfig:
 - filename: Client/src/test/example.test.ts
   checksum: 9b07cef3ac9fd7549e9bf779b2a0e81a59aba5cae2d72aba7ad5b693a60dba8e
 - filename: Server/config.py
-  checksum: a8b53ce0cf87f8ad447edee63d0b9e12be4fe1ff47c6fa69d5a16f7a5a49ef3e
+  checksum: fe5101d08598af222b0d961ee8f1261638d3dc0d712584ba8559fb7b86c838cf
 - filename: Client/src/components/Navbar.tsx
   checksum: 20603fdabecf41a71099ad21c6ea627020cad61a822eb9dc55870c7d2be3cd81
 - filename: Server/app.py
-  checksum: 2fe4b652c2114256a56c787ef059827fed3dbfe5b46aef3c7a356fb34bb6f1a7
+  checksum: 3a838d73662469ffc5694a91c0a09ce9021cc62865a76049f4f7d8a332951672
 - filename: Client/src/components/StudentLogin.tsx
   checksum: a436116b339c86c0f59d3fc12c194d07376405c8c0be41b7c43647fd1002a94b
 - filename: docker-compose.yml
-  checksum: 9cd4db6fdf20033c3ac9b55eca4c44353df8cc3729f435e706ccab718ac3c934
+  checksum: 0bfc28dd0c653dff51f9a272aee5414f52ee0cd4ac406ed69df4aa51a9cd5d52
 - filename: Client/src/components/BookSelection.tsx
   checksum: 01c86196d5d9db51be89b6c2d2cefa5b4914523a3d5e33ba8906eec5e8dadb29
 - filename: README.md
-  checksum: 35025939e8600b375bc328dee1e6bc9d249a0ef4365060d8426525ade8bb21f7
+  checksum: 5660fd484e9c1dc38ead405280f926665a1c64345d02b89f3142b72f146af714
 - filename: Client/bun.lockb
   checksum: de0504031b3f5ef43e2151fcdfb4a9d06bf0e8b34c0a68db4fd1a9f0da1382cc
 - filename: docs/assets/reading-assistant-flow-demo.mp4
@@ -79,4 +79,20 @@ fileignoreconfig:
   checksum: 25d6144f7a7c3da5d0e98acbd4395c418443b5b0d617ea97e2c290bcf64270ac
 - filename: docs/assets/reading-assistant-flow-demo.gif
   checksum: e03c0812ec99b44c5308e2713d6f606d12fb0e8a1b5485d51a72b67607a0ba73
+- filename: deploy/render/full-stack.yaml
+  checksum: 2d2bff48c6ecf0803f8d5d88a670c1e594f5fe7dad7912e3df57c7175772412e
+- filename: Server/worker.py
+  checksum: 2028e149b415d24a69df9304d9955ed214eae24aaa9394959b2fd64a513a3554
+- filename: render.yaml
+  checksum: a0712acd461086b3c1127aab2d4440bb316f55f3eda63c01ec82203ab8ee232e
+- filename: Server/tests/test_worker.py
+  checksum: 929b6b21ba2d6ba00e5118acd454a22a352958eb1c5300699799bf8be01a9c96
+- filename: docs/deployment-render.md
+  checksum: 948c0fe061465cfc5acea866b7341433cb0d5a8ab152ec14e47e1c487b6a0a7b
+- filename: docs/frontend.md
+  checksum: a76d07eae387da2db444a9e587d14612ed67916f83fa3d7773188f3f056d6740
+- filename: Client/src/test/bookService.test.ts
+  checksum: 84d89ab7f5c0fbafb5591f1e988970eee89bd288ec7021eb6cb2bd5bb5c32ce3
+- filename: docs/architecture.md
+  checksum: fc2b667c513c336f1684872acad06813551abb2dad6053a58345dc98f5af0481
 version: "1.0"

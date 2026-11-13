@@ -49,6 +49,7 @@ class Settings:
     host: str = "0.0.0.0"
     port: int = 8765                     # WebSocket (audio) endpoint
     media_port: int = 8766               # HTTP endpoint: /health, /books.json, /books/*
+    serve_ws: bool = True                # disable for media-only deployments
     serve_media: bool = True
     max_ws_message_bytes: int = 26_214_400  # 25 MB
 
@@ -99,6 +100,7 @@ class Settings:
             host=_str("HOST", cls.host),
             port=_int("PORT", cls.port),
             media_port=_int("MEDIA_PORT", cls.media_port),
+            serve_ws=_bool("SERVE_WS", cls.serve_ws),
             serve_media=_bool("SERVE_MEDIA", cls.serve_media),
             max_ws_message_bytes=_int("MAX_WS_MESSAGE_BYTES", cls.max_ws_message_bytes),
             accumulation_window_seconds=_float("ACCUMULATION_WINDOW_SECONDS", cls.accumulation_window_seconds),

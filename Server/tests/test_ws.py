@@ -9,6 +9,7 @@ audio → transcription → help_needed pipeline works.
 import asyncio
 import base64
 import json
+from typing import cast
 
 from conftest import FakeLLM, FakeSTT, FakeTTS, make_settings
 from websockets.asyncio.client import connect
@@ -162,7 +163,7 @@ async def test_reading_aloud_is_not_interrupted():
             # No help message may arrive — and the LLM must never be called.
             with pytest.raises(asyncio.TimeoutError):
                 await _receive_until(ws, "help_needed", timeout=1.0)
-            assert server.llm.prompts == []
+            assert cast(FakeLLM, server.llm).prompts == []
 
 
 async def test_question_while_reading_is_answered():
@@ -185,8 +186,9 @@ async def test_question_while_reading_is_answered():
             assert help_needed["intent"] == "question"
             assert help_needed["help_message"]
             # The question prompt must include the passage AND the question.
-            assert "little dragon" in server.llm.prompts[0]
-            assert "What does this word mean?" in server.llm.prompts[0]
+            llm_prompts = cast(FakeLLM, server.llm).prompts
+            assert "little dragon" in llm_prompts[0]
+            assert "What does this word mean?" in llm_prompts[0]
 
 
 async def test_word_question_is_answered_from_the_passage():
@@ -243,7 +245,7 @@ async def test_out_of_context_question_gets_out_of_context_reply():
             help_needed = await _receive_until(ws, "help_needed")
             assert help_needed["help_message"] == OUT_OF_CONTEXT_ANSWER
             assert help_needed["intent"] == "question"
-            assert server.llm.prompts == []
+            assert cast(FakeLLM, server.llm).prompts == []
 
 
 async def test_llm_failure_still_answers_the_question():

@@ -65,7 +65,7 @@ async def test_analyze_requests_json_response_format():
     verdict = await llm.analyze("analyze this prompt")
 
     assert verdict == {"needs_help": True}
-    call = llm._client.chat.completions.calls[0]
+    call = cast(Any, llm._client).chat.completions.calls[0]
     assert call["response_format"] == {"type": "json_object"}
     assert call["model"] == "fake-model"
     assert call["messages"][0]["content"] == "analyze this prompt"
@@ -83,7 +83,7 @@ async def test_analyze_retries_without_response_format_when_unsupported():
     verdict = await llm.analyze("prompt")
 
     assert verdict == {"needs_help": False, "reason": "all good"}
-    calls = llm._client.chat.completions.calls
+    calls = cast(Any, llm._client).chat.completions.calls
     assert len(calls) == 2
     assert "response_format" in calls[0]
     assert "response_format" not in calls[1]

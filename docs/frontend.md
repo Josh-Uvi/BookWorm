@@ -18,6 +18,150 @@ narration with synchronized word highlighting.
 - **@tanstack/react-query**, **framer-motion**, **lucide-react**, shadcn/ui components
 - **vitest** + **@testing-library** for tests
 
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph Routing["Routes (react-router-dom)"]
+        L["/ · Landing"] --> LG["/login · Student Login"]
+        LG --> BK["/books · Book Selection"]
+        BK --> RD["/reading · Reading Session"]
+        RD --> PR["/profile · Profile + history"]
+        IN["/interests"]
+    end
+
+    subgraph State["State"]
+        Ctx["ReadingFlowContext<br/>currentStudent · selectedBook · readingHistory"]
+        LS["useLocalStorage<br/>user-interests · user-preferences · theme"]
+    end
+
+    subgraph Hooks["Hooks"]
+        Rec["useAudioRecorder"]
+        Asst["useReadingAssistant"]
+        Speak["useSpeechReader"]
+    end
+
+    subgraph Services["Services"]
+        BS["bookService"]
+        CFS["contentfulService"]
+        WSM["wsMessages (pure parser)"]
+    end
+
+    Guard["RequireStudent<br/>login / books / reading / profile"]
+    SS[("sessionStorage<br/>reading-flow-session")]
+    LSS[("localStorage")]
+    API["GET /api/books?level=2|3<br/>GET /media/books.json"]
+    CDN[("Contentful CDA + asset CDN")]
+    WSS["wss://…/ws"]
+    TTS["Web Speech API (read-along)"]
+
+    Guard --> L
+    Ctx --- SS
+    LS --- LSS
+    Ctx --> LG & BK & RD & PR
+    BK --> BS
+    RD --> BS & Rec & Asst & Speak
+    BS --> CFS
+    BS --> API
+    CFS -.-> CDN
+    Asst --> WSM
+    Asst --> WSS
+    Speak --> TTS
+```
+
+Chapter-based books render in-app (read-along + styling work); PDF books render in an
+iframe, so those controls are hidden.
+
+### Catalogue resolution
+
+```mermaid
+flowchart LR
+    Start["fetchBooksByLevel(level)"] --> CMS{"Contentful<br/>configured?"}
+    CMS -->|"yes"| C1["fetchContentfulBooksByLevel"]
+    C1 -->|"books found"| R1["source: contentful"]
+    C1 -->|"error / empty"| API
+    CMS -->|"no"| API["GET /api/books?level=level"]
+    API -->|"valid payload"| R2["source: postgres · media · mock"]
+    API -->|"error / empty"| MEDIA["GET /media/books.json<br/>(HEAD-probe each PDF)"]
+    MEDIA -->|"match"| R3["source: media"]
+    MEDIA -->|"error / empty"| FALL["bundled readingLevelBooks / sampleBooks"]
+    FALL --> R4["source: bundled · fellBack: true"]
+```
+
+`fetchBooks()` / `fetchReadableBook()` use the same order and finally fall back to the bundled
+samples, so the reading page always renders something. Absolute URLs (e.g. Contentful assets)
+bypass the `VITE_MEDIA_URL` prefix, and CMS books skip the cross-origin `HEAD` probe
+(`normalizeApiBook` / `resolveMediaUrl` in `src/services/bookService.ts`).
+
+### State & persistence (ERD)
+
+There are no accounts: the profile, chosen book, history and preferences live in the browser,
+which is also what lets the free hybrid demo survive server spin-downs.
+
+```mermaid
+erDiagram
+    STUDENT_PROFILE {
+        string id PK "student-a | student-b"
+        string displayName
+        string readingLabel
+        integer readingLevel "2 | 3"
+        string voice "Tiffany | Amy"
+        string voiceLocale "en-US | en-GB"
+        string systemPrompt
+    }
+
+    READING_FLOW_SESSION {
+        string storage_key PK "sessionStorage: reading-flow-session"
+        string currentStudent FK
+    }
+
+    BOOK {
+        string id PK
+        string title
+        string author
+        string coverUrl
+        string pdfUrl "absolute (CMS) or /media path"
+        string chapters "chapter-based fallback"
+    }
+
+    READING_PROGRESS {
+        string bookId FK
+        string chapterId
+        integer progress
+        string lastRead
+        string bookTitle "snapshot"
+        string chapterTitle "snapshot"
+        integer readingLevel "snapshot"
+    }
+
+    USER_PREFERENCES {
+        string storage_key PK "localStorage: user-preferences"
+        integer fontSize
+        integer lineSpacing
+        string theme "dark | light"
+    }
+
+    USER_INTERESTS {
+        string storage_key PK "localStorage: user-interests"
+        string interests "string list"
+    }
+
+    STUDENT_PROFILE ||--o| READING_FLOW_SESSION : "login"
+    READING_FLOW_SESSION ||--o| BOOK : "selectBook"
+    READING_FLOW_SESSION ||--o{ READING_PROGRESS : "recordProgress (upsert)"
+    READING_FLOW_SESSION ||--o| READING_FLOW_SESSION : "switchStudent resets book+history"
+```
+
+Reducers live in `src/contexts/readingFlowState.ts` (`login`, `update-student`, `select-book`,
+`record-progress`, `clear-history`, `switch-student`) and are unit-tested; history entries carry
+a book snapshot so the Profile page needs no catalogue lookup.
+
+### Split deployment (free demo)
+
+Point `VITE_WS_URL` at the Render service and set the `VITE_CONTENTFUL_*` variables to serve
+the catalogue from the CMS instead of the media server; everything else (routing, state,
+read-along) is unchanged. Walkthrough: [docs/deployment-render.md](deployment-render.md).
+
 ## The audio pipeline (E2E)
 
 ```
@@ -79,7 +223,8 @@ cross-document text, so it hides the ineffective settings/read-along controls fo
 | `src/components/BookSelection.tsx` | Level-filtered book cards, loading/error states, and single selection |
 | `src/contexts/ReadingFlowContext.tsx` | Shared, session-persisted student/book/reading-history state used by `/login`, `/books`, `/reading`, the navbar, and profile-page logout |
 | `src/contexts/readingFlowState.ts` | Pure reducer (unit-tested): login, book selection, progress upsert, clear-history, switch-student |
-| `src/services/bookService.ts` | Loads `/api/books?level=X` and `/media/books.json`; resolves media URLs; provides bundled fallback data |
+| `src/services/bookService.ts` | Catalogue resolution chain: Contentful → `/api/books?level=X` → `/media/books.json` → bundled samples; resolves media URLs (absolute URLs pass through) |
+| `src/services/contentfulService.ts` | Optional Contentful CMS source (entries → `Book`, asset URLs); inert unless `VITE_CONTENTFUL_*` is configured |
 | `src/pages/Landing.tsx` | Public entry page at `/`; **Get Started** sends visitors to `/login` |
 | `src/pages/Reading.tsx` | PDF branch (iframe) and chapter branch + assistant sidebar & floating controls |
 | `src/pages/Profile.tsx` | Student profile editing, reading history with **Clear History**, and the single **Logout** (returns to `/`) |
@@ -90,9 +235,19 @@ cross-document text, so it hides the ineffective settings/read-along controls fo
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `VITE_WS_URL` | *(same-origin `/ws`)* | WebSocket endpoint override (`ws://host:8765`) |
-| `VITE_MEDIA_URL` | `/media` | Media root for `books.json` + PDFs |
+| `VITE_WS_URL` | *(same-origin `/ws`)* | WebSocket endpoint override (`ws://host:8765`, `wss://…/ws` in the split demo) |
+| `VITE_MEDIA_URL` | `/media` | Media root for `books.json` + PDFs (absolute URLs are honoured as-is) |
 | `VITE_API_URL` | `/api` | Reading-level books API root |
+| `VITE_CONTENTFUL_SPACE_ID` | *(unset)* | Enables the Contentful catalogue when paired with a token |
+| `VITE_CONTENTFUL_ACCESS_TOKEN` | *(unset)* | Read-only Content Delivery API token (ships in the bundle) |
+| `VITE_CONTENTFUL_ENVIRONMENT` | `master` | Contentful environment |
+| `VITE_CONTENTFUL_CONTENT_TYPE` | `book` | Content type id for book entries |
+| `VITE_CONTENTFUL_HOST` | `cdn.contentful.com` | CDA host override (e.g. `cdn.eu.contentful.com`) |
+
+`VITE_*` values are baked in at build time. With a Contentful space configured
+the CMS wins over both `/api` and `/media`; without it the platform sources run
+exactly as before (see [docs/deployment-render.md](deployment-render.md) for the
+free split deployment).
 
 The same-origin defaults work everywhere because the proxies match:
 
@@ -127,7 +282,7 @@ Notes:
 | `src/test/wsMessages.test.ts` | Server-message parsing: transcription / help / error / invalid / unknown |
 | `src/test/wsUrl.test.ts` | `resolveWsUrl` default/override behaviour and assistant-control readiness by connection status |
 | `src/test/speechReader.test.ts` | Tokenization, boundary mapping, voice ranking, punctuation-aware timing, and elapsed-time catch-up |
-| `src/test/bookService.test.ts` | Media fetch + `pdfUrl` resolution, sample fallback, empty catalogue |
+| `src/test/bookService.test.ts` | Media fetch + `pdfUrl` resolution, sample fallback, empty catalogue, source priority, absolute CMS URLs |
 | `src/test/readingFlowState.test.ts` | Flow reducer: student/book session coupling, history snapshots, upsert, clear-history, switch-student reset |
 
 ## Reading history
