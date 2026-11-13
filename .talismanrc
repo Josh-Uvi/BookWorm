@@ -6,7 +6,7 @@ fileignoreconfig:
 - filename: Client/src/vite-env.d.ts
   checksum: 3eb6748d07a68f7a63880314cc4cfb59510e5bbf28ec7a0e3dd2c841af92d033
 - filename: Client/package-lock.json
-  checksum: c21571da462280e619b78935ad8359be697603b1e652470b807f5b6dc981097a
+  checksum: cfaf8787fb33696d6134f4ac49308aa398faa65d51f97ef85cc201ac2d983e67
 - filename: .github/workflows/deploy-aws.yml
   checksum: 5de5747a589116b3468beffbe85344eef90eb780bafe179a27f3616e8b41ee80
 - filename: Client/src/pages/Interests.tsx
