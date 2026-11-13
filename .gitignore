@@ -35,3 +35,5 @@ media/books/*.mp3
 # ── Logs ───────────────────────────────────────────
 *.log
 logs/
+
+implementation-plan.md

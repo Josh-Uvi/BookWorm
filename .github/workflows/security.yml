@@ -1,0 +1,57 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Review dependency changes for known vulnerabilities
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Client/package-lock.json
+
+      - name: Audit npm dependencies
+        working-directory: Client
+        run: |
+          npm ci
+          npm audit --audit-level=high
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            Server/requirements.txt
+            Server/requirements-dev.txt
+
+      - name: Audit Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pip-audit
+          pip-audit --requirement Server/requirements.txt --requirement Server/requirements-dev.txt
