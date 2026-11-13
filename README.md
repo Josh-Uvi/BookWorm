@@ -1,6 +1,8 @@
-# AI Reading Assistant
+> **Disclaimer:** The idea for this project originated at an AWS hackathon. However, this repository uses no code or other input from the hackathon. The implementation, design, and all other aspects of this codebase are entirely my own.
 
-AI reading companion for children. This platform-agnostic reading app lets users open a book and read it aloud, while the assistant **listens in real time** — transcribing their speech, detecting when they struggle, and responding with a friendly, encouraging help message or answering context-related questions.
+# AI Reading Companion
+
+AI reading companion for children. This platform-agnostic reading app lets users open a book and read aloud while the assistant **listens in real time**—transcribing their speech, detecting when they struggle, and responding with a friendly, encouraging message or answering context-related questions.
 
 ### App Flow
 
@@ -29,7 +31,7 @@ credentials required:
 ┌───────────────────────────┐       ws://…/ws       ┌────────────────────────────┐
 │ Client (React + Vite)     │ ── audio (base64) ──▶ │ Server (Python, asyncio)   │
 │ getUserMedia +            │ ── chapter context ─▶ │ faster-whisper STT         │
-│ MediaRecorder            │ ◀── transcript ────── │ guardrails: reading vs.     │
+│ MediaRecorder            │ ◀── transcript ────── │ guardrails: reading vs     │
 │ plays spoken help         │ ◀── help + MP3/WAV ── │ asking? + LLM “needs help?”│
 └───────────────────────────┘                       │ Piper / edge-tts TTS       │
         │  loads books.json + PDFs from /media     │ books: local / MinIO       │
