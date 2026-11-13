@@ -6,7 +6,7 @@ fileignoreconfig:
 - filename: Client/src/vite-env.d.ts
   checksum: 3eb6748d07a68f7a63880314cc4cfb59510e5bbf28ec7a0e3dd2c841af92d033
 - filename: Client/package-lock.json
-  checksum: c21571da462280e619b78935ad8359be697603b1e652470b807f5b6dc981097a
+  checksum: cfaf8787fb33696d6134f4ac49308aa398faa65d51f97ef85cc201ac2d983e67
 - filename: .github/workflows/deploy-aws.yml
   checksum: 5de5747a589116b3468beffbe85344eef90eb780bafe179a27f3616e8b41ee80
 - filename: Client/src/pages/Interests.tsx
@@ -60,7 +60,7 @@ fileignoreconfig:
 - filename: Client/src/components/Navbar.tsx
   checksum: 20603fdabecf41a71099ad21c6ea627020cad61a822eb9dc55870c7d2be3cd81
 - filename: Server/app.py
-  checksum: 6d9c05d17c1444c6a162785ae26795fa10cb10f9e5ddbe52f7ea699317102dc8
+  checksum: 2fe4b652c2114256a56c787ef059827fed3dbfe5b46aef3c7a356fb34bb6f1a7
 - filename: Client/src/components/StudentLogin.tsx
   checksum: a436116b339c86c0f59d3fc12c194d07376405c8c0be41b7c43647fd1002a94b
 - filename: docker-compose.yml
