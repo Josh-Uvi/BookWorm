@@ -20,7 +20,7 @@ jobs:
       - name: Review dependency changes for known vulnerabilities
         uses: actions/dependency-review-action@v4
         with:
-          fail-on-severity: high
+          fail-on-severity: moderate
 
   audit:
     name: Dependency vulnerability audit
@@ -39,19 +39,15 @@ jobs:
         working-directory: Client
         run: |
           npm ci
-          npm audit --audit-level=high
+          npm audit --audit-level=moderate
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Scan Python dependencies with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: |
-            Server/requirements.txt
-            Server/requirements-dev.txt
-
-      - name: Audit Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pip-audit
-          pip-audit --requirement Server/requirements.txt --requirement Server/requirements-dev.txt
+          scan-type: fs
+          scan-ref: Server
+          scanners: vuln
+          severity: MODERATE,HIGH,CRITICAL
+          ignore-unfixed: false
+          format: table
+          exit-code: "1"
