@@ -128,11 +128,12 @@ describe("bookService", () => {
     ];
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) =>
-        String(input).includes("cdn.contentful.com")
+      vi.fn(async (input: RequestInfo | URL) => {
+        const requestUrl = input instanceof URL ? input : new URL(String(input), "http://localhost");
+        return requestUrl.hostname === "cdn.contentful.com"
           ? { ok: false, status: 503, json: async () => ({}) }
-          : { ok: true, json: async () => mediaBooks }
-      )
+          : { ok: true, json: async () => mediaBooks };
+      })
     );
 
     const books = await fetchBooks();
